@@ -1,0 +1,10 @@
+{
+    entry = {
+		bundle = FAPreferences;
+		cell = PSLinkCell;
+		detail = FAPreferencesListController;
+		icon = FAPreferences.png;
+		isController = 1;
+		label = FoldMusic;
+    };
+}
