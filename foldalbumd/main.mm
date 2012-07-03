@@ -93,28 +93,26 @@ static FADaemonNotificationHandler *sharedInstance_ = nil;
 
 int main() {
 	NSLog(@"Welcome to foldalbumd!");
+	@autoreleasepool {	
+		FADaemonNotificationHandler *hdl = [FADaemonNotificationHandler sharedInstance];
 	
-	NSAutoreleasePool *pool = [NSAutoreleasePool new];
+		CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
+		[center registerForMessageName:@"SetQuery" target:hdl selector:@selector(setQuery:userInfo:)];
+		[center registerForMessageName:@"NowPlayingItem" target:hdl selector:@selector(nowPlayingItem)];
+		[center registerForMessageName:@"PlaybackState" target:hdl selector:@selector(playbackState)];
+		[center registerForMessageName:@"Play" target:hdl selector:@selector(play)];
+		[center registerForMessageName:@"Pause" target:hdl selector:@selector(pause)];
+		[center registerForMessageName:@"Stop" target:hdl selector:@selector(stop)];
+		[center registerForMessageName:@"SeekBackward" target:hdl selector:@selector(seekBackward)];
+		[center registerForMessageName:@"SeekForward" target:hdl selector:@selector(seekForward)];
+		[center registerForMessageName:@"EndSeeking" target:hdl selector:@selector(endSeek)];
+		[center registerForMessageName:@"PreviousItem" target:hdl selector:@selector(previousItem)];
+		[center registerForMessageName:@"NextItem" target:hdl selector:@selector(nextItem)];
+		[center registerForMessageName:@"SeekBeginning" target:hdl selector:@selector(seekBeginning)];
+		[center registerForMessageName:@"PlaybackTime" target:hdl selector:@selector(playbackTime)];
+		[center runServerOnCurrentThread];
 	
-	FADaemonNotificationHandler *hdl = [FADaemonNotificationHandler sharedInstance];
-	
-	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
-	[center registerForMessageName:@"SetQuery" target:hdl selector:@selector(setQuery:userInfo:)];
-	[center registerForMessageName:@"NowPlayingItem" target:hdl selector:@selector(nowPlayingItem)];
-	[center registerForMessageName:@"PlaybackState" target:hdl selector:@selector(playbackState)];
-	[center registerForMessageName:@"Play" target:hdl selector:@selector(play)];
-	[center registerForMessageName:@"Pause" target:hdl selector:@selector(pause)];
-	[center registerForMessageName:@"Stop" target:hdl selector:@selector(stop)];
-	[center registerForMessageName:@"SeekBackward" target:hdl selector:@selector(seekBackward)];
-	[center registerForMessageName:@"SeekForward" target:hdl selector:@selector(seekForward)];
-	[center registerForMessageName:@"EndSeeking" target:hdl selector:@selector(endSeek)];
-	[center registerForMessageName:@"PreviousItem" target:hdl selector:@selector(previousItem)];
-	[center registerForMessageName:@"NextItem" target:hdl selector:@selector(nextItem)];
-	[center registerForMessageName:@"SeekBeginning" target:hdl selector:@selector(seekBeginning)];
-	[center registerForMessageName:@"PlaybackTime" target:hdl selector:@selector(playbackTime)];
-	[center runServerOnCurrentThread];
-	
-	CFRunLoopRun();
-	[pool drain];
+		CFRunLoopRun();
+	}
 	return 0;
 }
