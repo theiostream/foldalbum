@@ -11,6 +11,8 @@
 	-- work out copied functions
 	-- FAMediaPickerController sucks.
 	--- increase scrolling performance.
+	
+	- Proposal: Have buttons/et al. inside FACalloutView
 */
 
 // I used to be a good developer.
@@ -117,7 +119,7 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 		MPMediaItemCollection *collection = [(FAFolder *)folder mediaCollection];
 		
 		UILabel *&groupLabel = MSHookIvar<UILabel *>(self, "_label");
-		[groupLabel setFrame:(CGRect){{groupLabel.frame.origin.x-7, groupLabel.frame.origin.y}, {235, 20}}];
+		[groupLabel setFrame:(CGRect){{groupLabel.frame.origin.x-7, groupLabel.frame.origin.y}, {230, 20}}];
 		[groupLabel setFont:[[groupLabel font] fontWithSize:20.f]];
 		[groupLabel setTextAlignment:UITextAlignmentLeft];
 		[groupLabel setAdjustsFontSizeToFitWidth:YES];
@@ -155,8 +157,8 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 			subtitleLabel.origin.y -= 20;
 		
 		UIView *controllerContent = [[[UIView alloc] initWithFrame:CGRectMake(255, groupLabel.bounds.origin.y+5, 60, 25)] autorelease];
-		UIImage *musicImage = [[UIImage imageWithContentsOfFile:@"/Library/FoldAlbum/music.png"] resizedImage:CGSizeMake(25, 25) interpolationQuality:kCGInterpolationHigh];
-		UIImage *speakerImage = [[UIImage imageWithContentsOfFile:@"/Library/FoldAlbum/speaker.png"] resizedImage:CGSizeMake(22, 22) interpolationQuality:kCGInterpolationHigh];
+		UIImage *musicImage = [[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/music.png"] resizedImage:CGSizeMake(25, 25) interpolationQuality:kCGInterpolationHigh];
+		UIImage *speakerImage = [[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/speaker.png"] resizedImage:CGSizeMake(22, 22) interpolationQuality:kCGInterpolationHigh];
 		
 		UIButton *musicButton = [UIButton buttonWithType:UIButtonTypeCustom];
 		[musicButton setFrame:CGRectMake(0, 0, 25, 25)];
@@ -216,10 +218,10 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	
 	UIView *content = [[[UIView alloc] initWithFrame:CGRectMake(0, 0, 130, 35)] autorelease];
 	
-	UIImage *play = [UIImage imageWithContentsOfFile:@"/Library/FoldAlbum/play.png"];
-	UIImage *pause = [UIImage imageWithContentsOfFile:@"/Library/FoldAlbum/pause.png"];
-	UIImage *backward = [UIImage imageWithContentsOfFile:@"/Library/FoldAlbum/backward.png"];
-	UIImage *forward = [UIImage imageWithContentsOfFile:@"/Library/FoldAlbum/forward.png"];
+	UIImage *play = [UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/play.png"];
+	UIImage *pause = [UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/pause.png"];
+	UIImage *backward = [UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/backward.png"];
+	UIImage *forward = [UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/forward.png"];
 	
 	UIButton *backwardButton = [UIButton buttonWithType:UIButtonTypeCustom];
 	[backwardButton setFrame:CGRectMake(10, 2.5, 30, 30)];
@@ -267,12 +269,12 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	}
 	
 	if (state == MPMusicPlaybackStatePlaying) {
-		[button setImage:[UIImage imageWithContentsOfFile:@"/Library/FoldAlbum/play.png"] forState:UIControlStateNormal];
+		[button setImage:[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum//play.png"] forState:UIControlStateNormal];
 		[center sendMessageName:@"Pause" userInfo:nil];
 	}
 	
 	else {
-		[button setImage:[UIImage imageWithContentsOfFile:@"/Library/FoldAlbum/pause.png"] forState:UIControlStateNormal];
+		[button setImage:[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/pause.png"] forState:UIControlStateNormal];
 		[center sendMessageName:@"Play" userInfo:nil];
 	}
 }
@@ -347,13 +349,13 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	g_content = [btn superview];
 	[UIView animateWithDuration:0.2f animations:^{
 		CGRect fr = [g_content frame];
-		fr.origin.x -= 15;
+		fr.origin.x -= 20;
 		[g_content setFrame:fr];
 	}];
 	
 	MPVolumeView *slider = [[[MPVolumeView alloc] initWithFrame:CGRectMake(0, 0, 200.0, 20)] autorelease];
 	[alert setCenteredView:slider animated:YES];
-	[alert setAnchorPoint:CGPointMake(282.5, 25) boundaryRect:[[UIScreen mainScreen] applicationFrame] animate:YES];
+	[alert setAnchorPoint:CGPointMake(287.5, 25) boundaryRect:[[UIScreen mainScreen] applicationFrame] animate:YES];
 	[self addSubview:alert];
 }
 
@@ -362,7 +364,7 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	if (fromVolume) {
 		[UIView animateWithDuration:0.2f animations:^{
 			CGRect fr = [g_content frame];
-			fr.origin.x += 15;
+			fr.origin.x += 20;
 			[g_content setFrame:fr];
 		}];
 	}
@@ -370,11 +372,13 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	fromVolume = NO;
 }
 
+// I do hope this doesn't leak.
+// Also, yay for vim!
 %new(@@:)
 - (NSArray *)itemKeys {
 	NSArray *_itemKeys = !([[(FAFolder *)[self folder] mediaCollection] isKindOfClass:[MPMediaPlaylist class]]) ?
-		[[NSArray arrayWithObjects:MPMediaItemPropertyPlaybackDuration, MPMediaItemPropertyPlayCount, nil] retain] :
-		[[NSArray arrayWithObjects:MPMediaItemPropertyPlaybackDuration, MPMediaItemPropertyPlayCount, MPMediaItemPropertyArtist, MPMediaItemPropertyAlbumTitle, nil] retain];
+		[NSArray arrayWithObjects:MPMediaItemPropertyPlaybackDuration, MPMediaItemPropertyPlayCount, nil] :
+		[NSArray arrayWithObjects:MPMediaItemPropertyPlaybackDuration, MPMediaItemPropertyPlayCount, MPMediaItemPropertyArtist, MPMediaItemPropertyAlbumTitle, nil];
 	
 	return _itemKeys;
 }
@@ -421,6 +425,10 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	
 	return cell;
 }
+
+//%new(v@:@@)
+//- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+	
 
 %new(v@:@@)
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -530,7 +538,7 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 				return artworkImage;
 		}
 		
-		return [[UIImage imageWithContentsOfFile:@"/Library/FoldAlbum/folder.png"] resizedImage:CGSizeMake(42, 42) interpolationQuality:kCGInterpolationHigh];
+		return [[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/folder.png"] resizedImage:CGSizeMake(42, 42) interpolationQuality:kCGInterpolationHigh];
 	}
 	
 	return %orig;
@@ -564,7 +572,8 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	%orig;
 	
 	if ([[self folder] isKindOfClass:%c(FAFolder)]) {
-		[[FANotificationHandler sharedInstance] removeKeyWithMessageName:nil userInfo:[NSDictionary dictionaryWithObject:[self displayName] forKey:@"Key"]];
+		// FIXME: Use FAPreferencesHandler instead of FANotificationHandler
+		[[FANotificationHandler sharedInstance] removeKeyWithMessageName:nil userInfo:[NSDictionary dictionaryWithObject:[(FAFolder *)[self folder] keyName] forKey:@"Key"]];
 	}
 }
 %end
@@ -644,7 +653,7 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 				FAFolder *folder = (FAFolder *)[icon folder];
 				
 				if ([folder isKindOfClass:%c(FAFolder)]) {
-					NSString *iconDisplayName = [folder displayName];
+					NSString *iconDisplayName = [folder keyName];
 					if (![handler keyExists:iconDisplayName])
 						continue;
 					
@@ -656,7 +665,7 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 					[iconData setObject:[NSNumber numberWithInteger:iconIndex] forKey:@"iconIndex"];
 					[iconData setObject:[NSKeyedArchiver archivedDataWithRootObject:[folder mediaCollection]] forKey:@"mediaCollection"];
 					
-					[handler updateKey:iconDisplayName withDictionary:iconData];
+					[handler optimizedUpdateKey:iconDisplayName withDictionary:iconData];
 				}
 			}
 		}
@@ -687,12 +696,12 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	FANotificationHandler *handler = [FANotificationHandler sharedInstance];
 	
 	CPDistributedMessagingCenter *messagingCenter = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.server"];
-    [messagingCenter runServerOnCurrentThread];
-    [messagingCenter registerForMessageName:@"Relayout" target:handler selector:@selector(relayout)];
-    [messagingCenter registerForMessageName:@"UpdateKey" target:handler selector:@selector(updateKeyWithMessageName:userInfo:)];
-    [messagingCenter registerForMessageName:@"OptimizedUpdateKey" target:handler selector:@selector(optimizedUpdateKeyWithMessageName:userInfo:)];
-    [messagingCenter registerForMessageName:@"RemoveKey" target:handler selector:@selector(removeKeyWithMessageName:userInfo:)];
-    [messagingCenter registerForMessageName:@"KeyExists" target:handler selector:@selector(keyExistsWithMessageName:userInfo:)];
-    [messagingCenter registerForMessageName:@"ObjectForKey" target:handler selector:@selector(objectForKeyWithMessageName:userInfo:)];
-    [messagingCenter registerForMessageName:@"AllKeys" target:handler selector:@selector(allKeys)];
+	[messagingCenter runServerOnCurrentThread];
+	[messagingCenter registerForMessageName:@"Relayout" target:handler selector:@selector(relayout)];
+	[messagingCenter registerForMessageName:@"UpdateKey" target:handler selector:@selector(updateKeyWithMessageName:userInfo:)];
+	[messagingCenter registerForMessageName:@"OptimizedUpdateKey" target:handler selector:@selector(optimizedUpdateKeyWithMessageName:userInfo:)];
+	[messagingCenter registerForMessageName:@"RemoveKey" target:handler selector:@selector(removeKeyWithMessageName:userInfo:)];
+	[messagingCenter registerForMessageName:@"KeyExists" target:handler selector:@selector(keyExistsWithMessageName:userInfo:)];
+	[messagingCenter registerForMessageName:@"ObjectForKey" target:handler selector:@selector(objectForKeyWithMessageName:userInfo:)];
+	[messagingCenter registerForMessageName:@"AllKeys" target:handler selector:@selector(allKeys)];
 }

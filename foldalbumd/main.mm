@@ -93,7 +93,8 @@ static FADaemonNotificationHandler *sharedInstance_ = nil;
 
 int main() {
 	NSLog(@"Welcome to foldalbumd!");
-	@autoreleasepool {	
+	
+	NSAutoreleasePool *pool = [NSAutoreleasePool new];
 		FADaemonNotificationHandler *hdl = [FADaemonNotificationHandler sharedInstance];
 	
 		CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
@@ -113,6 +114,7 @@ int main() {
 		[center runServerOnCurrentThread];
 	
 		CFRunLoopRun();
-	}
+	[pool drain];
+	
 	return 0;
 }

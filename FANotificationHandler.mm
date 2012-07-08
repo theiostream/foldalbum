@@ -22,7 +22,7 @@ static FANotificationHandler *sharedInstance_ = nil;
 	NSString *title = [userInfo objectForKey:@"Title"];
 	
 	SBIconListModel *availableModel = [[objc_getClass("SBIconController") sharedInstance] firstAvailableModel];
-	[availableModel addAlbumFolderForTitle:title andMediaCollection:collection atIndex:0 insert:NO];
+	[availableModel addAlbumFolderForTitle:title plusKeyName:title andMediaCollection:collection atIndex:0 insert:NO];
 }
 
 - (void)updateKeyWithMessageName:(NSString *)message userInfo:(NSDictionary *)userInfo {

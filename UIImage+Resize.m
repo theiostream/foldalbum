@@ -7,6 +7,10 @@
 #import "UIImage+RoundedCorner.h"
 #import "UIImage+Alpha.h"
 
+static void shut_up_compiler() {
+	return;
+}
+
 // Private helper methods
 @interface UIImage ()
 - (UIImage *)resizedImage:(CGSize)newSize
@@ -166,9 +170,11 @@
             transform = CGAffineTransformTranslate(transform, 0, newSize.height);
             transform = CGAffineTransformRotate(transform, -M_PI_2);
             break;
-    }
-    
-    switch (self.imageOrientation) {
+        default:
+        	shut_up_compiler();
+	}
+	
+	switch (self.imageOrientation) {
         case UIImageOrientationUpMirrored:     // EXIF = 2
         case UIImageOrientationDownMirrored:   // EXIF = 4
             transform = CGAffineTransformTranslate(transform, newSize.width, 0);
@@ -180,6 +186,8 @@
             transform = CGAffineTransformTranslate(transform, newSize.height, 0);
             transform = CGAffineTransformScale(transform, -1, 1);
             break;
+        default:
+        	shut_up_compiler();
     }
     
     return transform;

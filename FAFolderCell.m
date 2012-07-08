@@ -61,7 +61,7 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
 	if ((self = [super initWithStyle:style reuseIdentifier:reuseIdentifier])) {
 		idx = 0;
 		_property = [MPMediaItemPropertyPlaybackDuration retain];
-		_placeholder = [UIImageResize([UIImage imageWithContentsOfFile:@"/System/Library/PrivateFrameworks/iPodUI.framework/CoverFlowPlaceHolder44@2x.png"], CGSizeMake(32, 32)) retain];
+		_placeholder = [UIImageResize([UIImage imageWithContentsOfFile:@"/System/Library/PrivateFrameworks/iPodUI.framework/CoverFlowPlaceHolder44.png"], CGSizeMake(32, 32)) retain];
 		//_state = MPMusicPlaybackStateStopped;
 		
 		_label = [FAFolderCell _makeLabelWithRect:CGRectMake(47, 8, 0, 20)];
@@ -76,7 +76,7 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
     	[[__imageView layer] setBorderColor:[[UIColor whiteColor] CGColor]];
     	[[self contentView] addSubview:__imageView];
 		
-		UIImage *ind_ = [UIImage imageWithContentsOfFile:@"/System/Library/PrivateFrameworks/iPodUI.framework/NowPlayingListItemIcon@2x.png"];
+		UIImage *ind_ = [UIImage imageWithContentsOfFile:@"/System/Library/PrivateFrameworks/iPodUI.framework/NowPlayingListItemIcon.png"];
     	_speaker = [[[UIImageView alloc] initWithFrame:CGRectMake((_label.frame.size.width-50)+1, _label.frame.origin.y, 28, 24)] autorelease];
     	[_speaker setImage:ind_];
     	[_speaker setHidden:YES];

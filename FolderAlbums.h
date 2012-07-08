@@ -1,5 +1,6 @@
 #import <MediaPlayer/MediaPlayer.h>
 #import <AppSupport/CPDistributedMessagingCenter.h>
+#import "FACalloutView.h"
 
 @interface ISIconSupport : NSObject
 + (id)sharedInstance;
@@ -14,9 +15,11 @@
 @interface FAFolder : SBFolder
 - (MPMediaItemCollection *)mediaCollection;
 - (void)setMediaCollection:(MPMediaItemCollection *)mediaCollection;
+- (NSString *)keyName;
+- (void)setKeyName:(NSString *)key;
 @end
 
-@interface SBFolderView : UIView <UITableViewDelegate, UITableViewDataSource>
+@interface SBFolderView : UIView <UITableViewDelegate, UITableViewDataSource, FACalloutViewDelegate>
 - (BOOL)isAlbumFolder;
 - (SBFolder *)folder;
 - (NSArray *)itemKeys;
@@ -30,6 +33,7 @@
 @interface SBFolderIcon : SBIcon
 - (SBFolderIcon *)initWithFolder:(SBFolder *)folder;
 - (SBFolder *)folder;
+- (NSString *)displayName;
 @end
 
 @interface SBIconView : UIView
@@ -48,7 +52,7 @@
 
 @interface SBIconListModel : NSObject
 + (NSUInteger)maxIcons;
-- (void)addAlbumFolderForTitle:(NSString *)title andMediaCollection:(MPMediaItemCollection *)query atIndex:(NSUInteger)index insert:(BOOL)force;
+- (void)addAlbumFolderForTitle:(NSString *)title plusKeyName:(NSString *)keyName andMediaCollection:(MPMediaItemCollection *)query atIndex:(NSUInteger)index insert:(BOOL)force;
 - (NSArray *)icons;
 - (void)addIcon:(SBIcon *)icon;
 - (void)insertIcon:(SBIcon *)icon atIndex:(NSUInteger *)index;
