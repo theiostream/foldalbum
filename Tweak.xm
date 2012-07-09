@@ -1,18 +1,12 @@
 /*
-	(TODO)
+	Dev-related TODOs:
+	(user related ones are in a note inside Notes.app on my iPhone)
 	
-	- Player: Controls other folders.
-	- Preferences: Labels should be custom titles (according to Ariel)
-	- Indicators (now playing)
-	- Jittering
-	- New icons.
 	-- better FAFolder
 	-- work on category for MPMediaCollection to make playlist vs. album easier
 	-- work out copied functions
 	-- FAMediaPickerController sucks.
 	--- increase scrolling performance.
-	
-	- Proposal: Have buttons/et al. inside FACalloutView
 */
 
 // I used to be a good developer.
@@ -269,7 +263,7 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	}
 	
 	if (state == MPMusicPlaybackStatePlaying) {
-		[button setImage:[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum//play.png"] forState:UIControlStateNormal];
+		[button setImage:[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/play.png"] forState:UIControlStateNormal];
 		[center sendMessageName:@"Pause" userInfo:nil];
 	}
 	
@@ -312,12 +306,12 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	if (wasSeeking) {
 		[center sendMessageName:@"EndSeeking" userInfo:nil];
 		wasSeeking = NO;
+		
+		return;
 	}
 	
-	else {
-		[seekTimer invalidate];
-		[center sendMessageName:@"NextItem" userInfo:nil];
-	}
+	[seekTimer invalidate];
+	[center sendMessageName:@"NextItem" userInfo:nil];
 }
 
 %new(v@:)
@@ -327,16 +321,16 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	if (wasSeeking) {
 		[center sendMessageName:@"EndSeeking" userInfo:nil];
 		wasSeeking = NO;
+		
+		return;
 	}
 	
-	else {
-		[seekTimer invalidate];
-		
-		if ([[[center sendMessageAndReceiveReplyName:@"PlaybackTime" userInfo:nil] objectForKey:@"Interval"] integerValue] > 1)
-			[center sendMessageName:@"SeekBeginning" userInfo:nil];
-		else
-			[center sendMessageName:@"PreviousItem" userInfo:nil];
-	}
+	[seekTimer invalidate];
+	
+	if ([[[center sendMessageAndReceiveReplyName:@"PlaybackTime" userInfo:nil] objectForKey:@"Interval"] integerValue] > 1)
+		[center sendMessageName:@"SeekBeginning" userInfo:nil];
+	else
+		[center sendMessageName:@"PreviousItem" userInfo:nil];
 }
 
 %new(v@:@)
@@ -426,20 +420,17 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	return cell;
 }
 
-//%new(v@:@@)
-//- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-	
-
 %new(v@:@@)
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-	NSData *queue;
-	NSArray *target;
+	NSData *queue, *itemData;
+	unsigned int i;
+	
 	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
-	
 	NSArray *items = [[(FAFolder *)[self folder] mediaCollection] items];
-	MPMediaItem *cellItem = [items objectAtIndex:[indexPath row]];
 	
+	MPMediaItem *cellItem = [items objectAtIndex:[indexPath row]];
 	NSData *nowPlayingData = [[center sendMessageAndReceiveReplyName:@"NowPlayingItem" userInfo:nil] objectForKey:@"Item"];
+	
 	if (nowPlayingData) {
 		MPMediaItem *nowPlayingItem = [NSKeyedUnarchiver unarchiveObjectWithData:nowPlayingData];
 		MPMusicPlaybackState state = [[[center sendMessageAndReceiveReplyName:@"PlaybackState" userInfo:nil] objectForKey:@"State"] integerValue];
@@ -459,9 +450,14 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 		}
 	}
 	
-	target = [items subarrayWithRange:NSMakeRange([indexPath row], [items count]-[indexPath row])];
-	queue = [NSKeyedArchiver archivedDataWithRootObject:[MPMediaItemCollection collectionWithItems:target]];
+	for (i=0; i<[[[(FAFolder *)[self folder] mediaCollection] items] count]; i++)
+		NSLog(@"%@\n\t\t%@", [[[(FAFolder *)[self folder] mediaCollection] items] objectAtIndex:i], [[[[(FAFolder *)[self folder] mediaCollection] items] objectAtIndex:i] valueForProperty:MPMediaItemPropertyTitle]);
+	
+	queue = [NSKeyedArchiver archivedDataWithRootObject:[(FAFolder *)[self folder] mediaCollection]];
 	[center sendMessageName:@"SetQuery" userInfo:[NSDictionary dictionaryWithObject:queue forKey:@"Collection"]];
+	
+	itemData = [NSKeyedArchiver archivedDataWithRootObject:cellItem];
+	[center sendMessageName:@"SetNowPlaying" userInfo:[NSDictionary dictionaryWithObject:itemData forKey:@"Item"]];
 	
 	play:
 	[center sendMessageName:@"Play" userInfo:nil];
@@ -492,10 +488,10 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	SBFolderIcon *icon = [[[%c(SBFolderIcon) alloc] initWithFolder:folder] autorelease];
 	[icon setDelegate:[%c(SBIconController) sharedInstance]];
 	
+	NSUInteger modelIndex = [self index];
+	NSUInteger iconIndex = [self firstFreeSlotIndex];
+	
 	if (!insert) {
-		NSUInteger modelIndex = [self index];
-		NSUInteger iconIndex = [self firstFreeSlotIndex];
-		
 		NSMutableDictionary *dict = [NSMutableDictionary dictionary];
 		[dict setObject:[NSNumber numberWithInteger:(NSInteger)modelIndex] forKey:@"listIndex"];
 		[dict setObject:[NSNumber numberWithInteger:(NSInteger)iconIndex] forKey:@"iconIndex"];
@@ -507,6 +503,7 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	else
 		[self insertIcon:icon atIndex:&index];
 	
+	//[[%c(SBIconController) sharedInstance] scrollToIconListAtIndex:modelIndex animate:YES];
 	[[%c(SBIconController) sharedInstance] updateCurrentIconListIndexAndVisibility];
 }
 %end
@@ -580,24 +577,23 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 
 %hook SBIconController
 %new(@@:)
-- (NSArray *)rootIconLists {
-	return MSHookIvar<NSArray *>(self, "_rootIconLists");
+- (NSMutableArray *)rootIconLists {
+	return MSHookIvar<NSMutableArray *>(self, "_rootIconLists");
 }
 
 %new(@@:)
 - (SBIconListModel *)firstAvailableModel {
-	SBIconListModel *ret = nil;
-	
 	NSArray *rootIconLists = [self rootIconLists];
 	for (SBIconListView *view in rootIconLists) {
 		SBIconListModel *model = [view model];
-		if (![model isFull]) {
-			ret = model;
-			break;
-		}
+		if (![model isFull])
+			return model;
 	}
 	
-	return ret;
+	SBFolder *rootFolder = MSHookIvar<SBFolder *>(self, "_rootFolder");
+	// TODO: This method returns id. Maybe it returns the SBIconListView object?
+	[self addEmptyListViewForFolder:rootFolder];
+	return [(SBIconListView *)[rootIconLists lastObject] model];
 }
 
 %new(v@:)
@@ -684,7 +680,6 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 %end
 
 %ctor {
-	// Have IconSupport to prevent the worst.
 	// FIXME: Do we need IconSupport?
 	dlopen("/Library/MobileSubstrate/DynamicLibraries/IconSupport.dylib", RTLD_NOW);
 	[[objc_getClass("ISIconSupport") sharedInstance] addExtension:@"am.theiostre.foldalbum"];
@@ -696,7 +691,6 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	FANotificationHandler *handler = [FANotificationHandler sharedInstance];
 	
 	CPDistributedMessagingCenter *messagingCenter = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.server"];
-	[messagingCenter runServerOnCurrentThread];
 	[messagingCenter registerForMessageName:@"Relayout" target:handler selector:@selector(relayout)];
 	[messagingCenter registerForMessageName:@"UpdateKey" target:handler selector:@selector(updateKeyWithMessageName:userInfo:)];
 	[messagingCenter registerForMessageName:@"OptimizedUpdateKey" target:handler selector:@selector(optimizedUpdateKeyWithMessageName:userInfo:)];
@@ -704,4 +698,5 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	[messagingCenter registerForMessageName:@"KeyExists" target:handler selector:@selector(keyExistsWithMessageName:userInfo:)];
 	[messagingCenter registerForMessageName:@"ObjectForKey" target:handler selector:@selector(objectForKeyWithMessageName:userInfo:)];
 	[messagingCenter registerForMessageName:@"AllKeys" target:handler selector:@selector(allKeys)];
+	[messagingCenter runServerOnCurrentThread];
 }

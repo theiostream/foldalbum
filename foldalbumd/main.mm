@@ -1,4 +1,5 @@
 // TODO: Use scoped pools where needed.
+// foldalbumd! Please destroy this and start using SBMediaController!
 
 #import <MediaPlayer/MediaPlayer.h>
 #import <AppSupport/CPDistributedMessagingCenter.h>
@@ -34,6 +35,16 @@ static FADaemonNotificationHandler *sharedInstance_ = nil;
 - (void)setQuery:(NSString *)name userInfo:(NSDictionary *)dict {
 	MPMediaItemCollection *col = [NSKeyedUnarchiver unarchiveObjectWithData:[dict objectForKey:@"Collection"]];
 	[iPod setQueueWithItemCollection:col];
+}
+
+- (void)setVolume:(NSString *)name userInfo:(NSDictionary *)dict {
+	float volume = [[dict objectForKey:@"Volume"] floatValue];
+	[iPod setVolume:volume];
+}
+
+- (void)setNowPlaying:(NSString *)name userInfo:(NSDictionary *)dict {
+	MPMediaItem *mediaItem = [NSKeyedUnarchiver unarchiveObjectWithData:[dict objectForKey:@"Item"]];
+	[iPod setNowPlayingItem:mediaItem];
 }
 
 - (NSDictionary *)nowPlayingItem {
@@ -93,28 +104,31 @@ static FADaemonNotificationHandler *sharedInstance_ = nil;
 
 int main() {
 	NSLog(@"Welcome to foldalbumd!");
-	
 	NSAutoreleasePool *pool = [NSAutoreleasePool new];
-		FADaemonNotificationHandler *hdl = [FADaemonNotificationHandler sharedInstance];
 	
-		CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
-		[center registerForMessageName:@"SetQuery" target:hdl selector:@selector(setQuery:userInfo:)];
-		[center registerForMessageName:@"NowPlayingItem" target:hdl selector:@selector(nowPlayingItem)];
-		[center registerForMessageName:@"PlaybackState" target:hdl selector:@selector(playbackState)];
-		[center registerForMessageName:@"Play" target:hdl selector:@selector(play)];
-		[center registerForMessageName:@"Pause" target:hdl selector:@selector(pause)];
-		[center registerForMessageName:@"Stop" target:hdl selector:@selector(stop)];
-		[center registerForMessageName:@"SeekBackward" target:hdl selector:@selector(seekBackward)];
-		[center registerForMessageName:@"SeekForward" target:hdl selector:@selector(seekForward)];
-		[center registerForMessageName:@"EndSeeking" target:hdl selector:@selector(endSeek)];
-		[center registerForMessageName:@"PreviousItem" target:hdl selector:@selector(previousItem)];
-		[center registerForMessageName:@"NextItem" target:hdl selector:@selector(nextItem)];
-		[center registerForMessageName:@"SeekBeginning" target:hdl selector:@selector(seekBeginning)];
-		[center registerForMessageName:@"PlaybackTime" target:hdl selector:@selector(playbackTime)];
-		[center runServerOnCurrentThread];
+	FADaemonNotificationHandler *hdl = [FADaemonNotificationHandler sharedInstance];
+
+	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
+	[center registerForMessageName:@"SetQuery" target:hdl selector:@selector(setQuery:userInfo:)];
+	[center registerForMessageName:@"SetVolume" target:hdl selector:@selector(setVolume:userInfo:)];
+	[center registerForMessageName:@"NowPlayingItem" target:hdl selector:@selector(nowPlayingItem)];
+	[center registerForMessageName:@"PlaybackState" target:hdl selector:@selector(playbackState)];
+	[center registerForMessageName:@"Play" target:hdl selector:@selector(play)];
+	[center registerForMessageName:@"Pause" target:hdl selector:@selector(pause)];
+	[center registerForMessageName:@"Stop" target:hdl selector:@selector(stop)];
+	[center registerForMessageName:@"SeekBackward" target:hdl selector:@selector(seekBackward)];
+	[center registerForMessageName:@"SeekForward" target:hdl selector:@selector(seekForward)];
+	[center registerForMessageName:@"EndSeeking" target:hdl selector:@selector(endSeek)];
+	[center registerForMessageName:@"PreviousItem" target:hdl selector:@selector(previousItem)];
+	[center registerForMessageName:@"NextItem" target:hdl selector:@selector(nextItem)];
+	[center registerForMessageName:@"SeekBeginning" target:hdl selector:@selector(seekBeginning)];
+	[center registerForMessageName:@"PlaybackTime" target:hdl selector:@selector(playbackTime)];
+	[center registerForMessageName:@"SetNowPlaying" target:hdl selector:@selector(setNowPlaying:userInfo:)];
 	
-		CFRunLoopRun();
+	[center runServerOnCurrentThread];
+	// FIXME: Should we turn on the "KeepAlive" key instead of this? Will that work?
+	CFRunLoopRun();
+	
 	[pool drain];
-	
 	return 0;
 }

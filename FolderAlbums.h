@@ -76,6 +76,8 @@
 - (SBIconListModel *)firstAvailableModel;
 - (NSArray *)rootIconLists;
 - (void)updateCurrentIconListIndexAndVisibility;
+- (void)scrollToIconListAtIndex:(int)index animate:(BOOL)animate;
+- (id)addEmptyListViewForFolder:(id)folder;
 @end
 
 @interface SBIconModel : NSObject
