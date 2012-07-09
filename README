@@ -19,3 +19,7 @@ And without the projects:
 -- rpetrich's RunningIndicator
 -- theiostream's SearchCommands
 -- qwertyoruiop+Maximus's UISettings
+
+And it contains:
+-- Part of the MPMediaItemCollection category by Jamin Guy (don't recall name/link)
+-- The UIImage+Resize category by Trevor Harmon (http://vocaro.com/trevor/blog/2009/10/12/resize-a-uiimage-the-right-way/)
