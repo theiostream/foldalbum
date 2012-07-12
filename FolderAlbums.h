@@ -19,9 +19,11 @@
 - (void)setKeyName:(NSString *)key;
 @end
 
-@interface SBFolderView : UIView <UITableViewDelegate, UITableViewDataSource, FACalloutViewDelegate>
-- (BOOL)isAlbumFolder;
-- (SBFolder *)folder;
+@interface SBFolderView : UIView
+@end
+
+@interface FAFolderView : SBFolderView <UITableViewDelegate, UITableViewDataSource, FACalloutViewDelegate>
+- (FAFolder *)folder;
 - (NSArray *)itemKeys;
 @end
 

@@ -2,6 +2,8 @@
 	Dev-related TODOs:
 	(user related ones are in a note inside Notes.app on my iPhone)
 	
+	- libpsicons
+	
 	-- better FAFolder
 	-- work on category for MPMediaCollection to make playlist vs. album easier
 	-- work out copied functions
@@ -14,6 +16,10 @@
 
 // FAPreferences was an accidental name.
 
+/*%%%%%%%%%%%
+%% Imports
+%%%%%%%%%%%*/
+
 #import "FolderAlbums.h"
 #import "FAFolderCell.h"
 #import "FAPreferencesHandler.h"
@@ -21,8 +27,16 @@
 #import "UIImage+Resize.h"
 #import "FACalloutView.h"
 
+/*%%%%%%%%%%%
+%% Macros
+%%%%%%%%%%%*/
+
 #define SBLocalizedString(key) \
 	[[NSBundle mainBundle] localizedStringForKey:key value:@"None" table:@"SpringBoard"]
+
+/*%%%%%%%%%%%
+%% Declarations
+%%%%%%%%%%%*/
 
 static NSUInteger idx = 0;
 
@@ -35,6 +49,12 @@ static BOOL fromVolume = NO;
 static NSTimer *seekTimer = nil;
 static BOOL wasSeeking = NO;
 
+static CGRect groupFrame;
+
+/*%%%%%%%%%%%
+%% Functions
+%%%%%%%%%%%*/
+
 void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	CAShapeLayer *shape = [CAShapeLayer layer];
 	[shape setLineWidth:1.f];
@@ -45,7 +65,15 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	[[view layer] addSublayer:shape];
 }
 
+/*%%%%%%%%%%%
+%% Subclasses
+%%%%%%%%%%%*/
+
 %subclass FAFolder : SBFolder
+- (Class)folderViewClass {
+	return %c(FAFolderView);
+}
+
 - (NSArray *)allIcons {
 	NSMutableArray *ret = [NSMutableArray array];
 	SBIcon *empty = [[[%c(SBIcon) alloc] init] autorelease];
@@ -82,119 +110,109 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 }
 %end
 
-%hook SBFolderView
+// TODO: Check exactly how SBNewsstandFolderView handles this
+%subclass FAFolderView : SBFolderView
 %new(@@:)
-- (SBFolder *)folder {
-	return MSHookIvar<SBFolder *>(self, "_folder");
-}
-
-%new(c@:)
-- (BOOL)isAlbumFolder {
-	return [[self folder] isKindOfClass:%c(FAFolder)];
+- (FAFolder *)folder {
+	return MSHookIvar<FAFolder *>(self, "_folder");
 }
 
 - (void)textFieldDidEndEditing:(id)textField {
 	%orig;
 	
-	if ([self isAlbumFolder]) {
-		if ([[textField text] isEqualToString:@""])
-			[textField setText:[(FAFolder *)[self folder] keyName]];
-		
-		NSDictionary *update = [NSDictionary dictionaryWithObject:[textField text] forKey:@"fakeTitle"];
-		[[FAPreferencesHandler sharedInstance] optimizedUpdateKey:[(FAFolder *)[self folder] keyName] withDictionary:update];
-	}
+	if ([[textField text] isEqualToString:@""])
+		[textField setText:[(FAFolder *)[self folder] keyName]];
+	
+	NSDictionary *update = [NSDictionary dictionaryWithObject:[textField text] forKey:@"fakeTitle"];
+	[[FAPreferencesHandler sharedInstance] optimizedUpdateKey:[(FAFolder *)[self folder] keyName] withDictionary:update];
+	
+	UILabel *&groupLabel = MSHookIvar<UILabel *>(self, "_label");
+	[groupLabel setFrame:groupFrame];
 }
 
-- (void)setIconListView:(id)view {
-	if ([self isAlbumFolder]) {
-		idx = 0;
-		
-		SBFolder *folder = [self folder];
-		MPMediaItemCollection *collection = [(FAFolder *)folder mediaCollection];
-		
-		UILabel *&groupLabel = MSHookIvar<UILabel *>(self, "_label");
-		[groupLabel setFrame:(CGRect){{groupLabel.frame.origin.x-7, groupLabel.frame.origin.y}, {230, 20}}];
-		[groupLabel setFont:[[groupLabel font] fontWithSize:20.f]];
-		[groupLabel setTextAlignment:UITextAlignmentLeft];
-		[groupLabel setAdjustsFontSizeToFitWidth:YES];
-		[groupLabel setMinimumFontSize:16.f];
-		
-		CGRect subtitleLabel = CGRectMake(groupLabel.frame.origin.x, groupLabel.frame.origin.y+25, 241, 16);
-		if ([[groupLabel font] pointSize] < 20.f) {
-			[groupLabel setFrame:(CGRect){{groupLabel.frame.origin.x, groupLabel.frame.origin.y+3}, {groupLabel.frame.size.width, [[groupLabel font] pointSize]}}];
-			subtitleLabel.origin.y -= (subtitleLabel.origin.y-[[groupLabel font] pointSize]);
-		}
-		
-		UITextField *&textField = MSHookIvar<UITextField *>(self, "_textField");
-		[textField setPlaceholder:[(FAFolder *)[self folder] keyName]];
-		if (MSHookIvar<BOOL>(self, "_isEditing")) {
-			subtitleLabel.origin.y += 8;
-		}
-		
-		if (![collection isKindOfClass:[MPMediaPlaylist class]]) {
-			UILabel *artistLabel = [[[UILabel alloc] initWithFrame:subtitleLabel] autorelease];
-			[artistLabel setBackgroundColor:[UIColor clearColor]];
-			[artistLabel setFont:[[groupLabel font] fontWithSize:16.f]];
-			[artistLabel setAdjustsFontSizeToFitWidth:YES];
-			[artistLabel setMinimumFontSize:12.f];
-			[artistLabel setTextColor:[UIColor whiteColor]];
-			[artistLabel setText:[[collection representativeItem] valueForProperty:MPMediaItemPropertyArtist]];
-			
-			if ([[artistLabel font] pointSize] < 16.f) {
-				[artistLabel setFrame:(CGRect){artistLabel.frame.origin, {artistLabel.frame.size.width, [[artistLabel font] pointSize]}}];
-			}
-			
-			[self addSubview:artistLabel];
-		}
-		
-		else
-			subtitleLabel.origin.y -= 20;
-		
-		UIView *controllerContent = [[[UIView alloc] initWithFrame:CGRectMake(255, groupLabel.bounds.origin.y+5, 60, 25)] autorelease];
-		UIImage *musicImage = [[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/music.png"] resizedImage:CGSizeMake(25, 25) interpolationQuality:kCGInterpolationHigh];
-		UIImage *speakerImage = [[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/speaker.png"] resizedImage:CGSizeMake(22, 22) interpolationQuality:kCGInterpolationHigh];
-		
-		UIButton *musicButton = [UIButton buttonWithType:UIButtonTypeCustom];
-		[musicButton setFrame:CGRectMake(0, 0, 25, 25)];
-		[musicButton setImage:musicImage forState:UIControlStateNormal];
-		[musicButton addTarget:self action:@selector(showControlsCallout) forControlEvents:UIControlEventTouchUpInside];
-		
-		UIButton *speakerButton = [UIButton buttonWithType:UIButtonTypeCustom];
-		[speakerButton setFrame:CGRectMake(35, 0, 25, 25)];
-		[speakerButton setImage:speakerImage forState:UIControlStateNormal];
-		[speakerButton addTarget:self action:@selector(showVolumeCallout:) forControlEvents:UIControlEventTouchUpInside];
-		
-		[controllerContent addSubview:musicButton];
-		[controllerContent addSubview:speakerButton];
-		[self addSubview:controllerContent];
-		
-		CGFloat hei = subtitleLabel.origin.y+25;
-		CGMutablePathRef path = CGPathCreateMutable();
-		CGPathMoveToPoint(path, NULL, 0, hei);
-		CGPathAddLineToPoint(path, NULL, 320, hei);
-		_FADrawLineAtPath(self, path);
-		CGPathRelease(path);
-		
-		CGRect tableFrame = CGRectMake(0, subtitleLabel.origin.y+25, 320, self.bounds.size.height-(subtitleLabel.origin.y+25));
-		UITableView *dataTable = [[[UITableView alloc] initWithFrame:tableFrame style:UITableViewStylePlain] autorelease];
-		[dataTable setDelegate:self];
-		[dataTable setDataSource:self];
-		[dataTable setBackgroundColor:[UIColor clearColor]];
-		[dataTable setSeparatorColor:UIColorFromHexWithAlpha(0xFFFFFF, 0.37)];
-		[self addSubview:dataTable];
-		
-		UISwipeGestureRecognizer *rig = [[[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(nextItem:)] autorelease];
-		[rig setDirection:UISwipeGestureRecognizerDirectionRight];
-		UISwipeGestureRecognizer *lef = [[[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(nextItem:)] autorelease];
-		[lef setDirection:UISwipeGestureRecognizerDirectionLeft];
-		
-		[dataTable addGestureRecognizer:rig];
-		[dataTable addGestureRecognizer:lef];
-		
-		return;
+- (void)setIconListView:(UIView *)view {
+	idx = 0;
+	
+	SBFolder *folder = [self folder];
+	MPMediaItemCollection *collection = [(FAFolder *)folder mediaCollection];
+	
+	UILabel *&groupLabel = MSHookIvar<UILabel *>(self, "_label");
+	[groupLabel setFrame:(CGRect){{groupLabel.frame.origin.x-7, groupLabel.frame.origin.y}, {230, 20}}];
+	groupFrame = [groupLabel frame];
+	[groupLabel setFont:[[groupLabel font] fontWithSize:20.f]];
+	[groupLabel setTextAlignment:UITextAlignmentLeft];
+	[groupLabel setAdjustsFontSizeToFitWidth:YES];
+	[groupLabel setMinimumFontSize:16.f];
+	
+	CGRect subtitleLabel = CGRectMake(groupLabel.frame.origin.x, groupLabel.frame.origin.y+23, 241, 16);
+	if ([[groupLabel font] pointSize] < 20.f) {
+		[groupLabel setFrame:(CGRect){{groupLabel.frame.origin.x, groupLabel.frame.origin.y+3}, {groupLabel.frame.size.width, [[groupLabel font] pointSize]}}];
+		subtitleLabel.origin.y -= (subtitleLabel.origin.y-[[groupLabel font] pointSize]);
 	}
 	
-	%orig;
+	UITextField *&textField = MSHookIvar<UITextField *>(self, "_textField");
+	[textField setPlaceholder:[(FAFolder *)[self folder] keyName]];
+	[textField setFrame:(CGRect){{groupLabel.bounds.origin.x+5, groupLabel.bounds.origin.y+3}, {groupLabel.bounds.size.width, textField.frame.size.height-2}}];
+	
+	if (![collection isKindOfClass:[MPMediaPlaylist class]]) {
+		UILabel *artistLabel = [[[UILabel alloc] initWithFrame:subtitleLabel] autorelease];
+		[artistLabel setBackgroundColor:[UIColor clearColor]];
+		[artistLabel setFont:[[groupLabel font] fontWithSize:16.f]];
+		[artistLabel setAdjustsFontSizeToFitWidth:YES];
+		[artistLabel setMinimumFontSize:12.f];
+		[artistLabel setTextColor:[UIColor whiteColor]];
+		[artistLabel setText:[[collection representativeItem] valueForProperty:MPMediaItemPropertyArtist]];
+		
+		if ([[artistLabel font] pointSize] < 16.f) {
+			[artistLabel setFrame:(CGRect){artistLabel.frame.origin, {artistLabel.frame.size.width, [[artistLabel font] pointSize]}}];
+		}
+		
+		[self addSubview:artistLabel];
+	}
+	
+	else
+		subtitleLabel.origin.y -= 20;
+	
+	UIView *controllerContent = [[[UIView alloc] initWithFrame:CGRectMake(255, groupLabel.bounds.origin.y+5, 60, 25)] autorelease];
+	UIImage *musicImage = [[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/music.png"] resizedImage:CGSizeMake(25, 25) interpolationQuality:kCGInterpolationHigh];
+	UIImage *speakerImage = [[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/speaker.png"] resizedImage:CGSizeMake(22, 22) interpolationQuality:kCGInterpolationHigh];
+	
+	UIButton *musicButton = [UIButton buttonWithType:UIButtonTypeCustom];
+	[musicButton setFrame:CGRectMake(0, 0, 25, 25)];
+	[musicButton setImage:musicImage forState:UIControlStateNormal];
+	[musicButton addTarget:self action:@selector(showControlsCallout) forControlEvents:UIControlEventTouchUpInside];
+	
+	UIButton *speakerButton = [UIButton buttonWithType:UIButtonTypeCustom];
+	[speakerButton setFrame:CGRectMake(35, 0, 25, 25)];
+	[speakerButton setImage:speakerImage forState:UIControlStateNormal];
+	[speakerButton addTarget:self action:@selector(showVolumeCallout:) forControlEvents:UIControlEventTouchUpInside];
+	
+	[controllerContent addSubview:musicButton];
+	[controllerContent addSubview:speakerButton];
+	[self addSubview:controllerContent];
+	
+	CGFloat hei = subtitleLabel.origin.y+25;
+	CGMutablePathRef path = CGPathCreateMutable();
+	CGPathMoveToPoint(path, NULL, 0, hei);
+	CGPathAddLineToPoint(path, NULL, 320, hei);
+	_FADrawLineAtPath(self, path);
+	CGPathRelease(path);
+	
+	CGRect tableFrame = CGRectMake(0, subtitleLabel.origin.y+25, 320, self.bounds.size.height-(subtitleLabel.origin.y+25));
+	UITableView *dataTable = [[[UITableView alloc] initWithFrame:tableFrame style:UITableViewStylePlain] autorelease];
+	[dataTable setDelegate:self];
+	[dataTable setDataSource:self];
+	[dataTable setBackgroundColor:[UIColor clearColor]];
+	[dataTable setSeparatorColor:UIColorFromHexWithAlpha(0xFFFFFF, 0.37)];
+	[self addSubview:dataTable];
+	
+	UISwipeGestureRecognizer *rig = [[[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(nextItem:)] autorelease];
+	[rig setDirection:UISwipeGestureRecognizerDirectionRight];
+	UISwipeGestureRecognizer *lef = [[[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(nextItem:)] autorelease];
+	[lef setDirection:UISwipeGestureRecognizerDirectionLeft];
+	
+	[dataTable addGestureRecognizer:rig];
+	[dataTable addGestureRecognizer:lef];
 }
 
 %new(v@:)
@@ -203,10 +221,8 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	
 	MPMusicPlaybackState state;
 	NSData *nowPlayingData = [[center sendMessageAndReceiveReplyName:@"NowPlayingItem" userInfo:nil] objectForKey:@"Item"];
-	if (nowPlayingData) {
+	if (nowPlayingData)
 		state = [[[center sendMessageAndReceiveReplyName:@"PlaybackState" userInfo:nil] objectForKey:@"State"] integerValue];
-		NSLog(@"got state");
-	}
 	else
 		state = MPMusicPlaybackStateStopped;
 	
@@ -423,7 +439,6 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 %new(v@:@@)
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
 	NSData *queue, *itemData;
-	unsigned int i;
 	
 	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
 	NSArray *items = [[(FAFolder *)[self folder] mediaCollection] items];
@@ -450,9 +465,6 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 		}
 	}
 	
-	for (i=0; i<[[[(FAFolder *)[self folder] mediaCollection] items] count]; i++)
-		NSLog(@"%@\n\t\t%@", [[[(FAFolder *)[self folder] mediaCollection] items] objectAtIndex:i], [[[[(FAFolder *)[self folder] mediaCollection] items] objectAtIndex:i] valueForProperty:MPMediaItemPropertyTitle]);
-	
 	queue = [NSKeyedArchiver archivedDataWithRootObject:[(FAFolder *)[self folder] mediaCollection]];
 	[center sendMessageName:@"SetQuery" userInfo:[NSDictionary dictionaryWithObject:queue forKey:@"Collection"]];
 	
@@ -466,6 +478,10 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	[tableView deselectRowAtIndexPath:indexPath animated:YES];
 }
 %end
+
+/*%%%%%%%%%%%
+%% Hooks
+%%%%%%%%%%%*/
 
 // Add folders
 %hook SBIconListModel
@@ -496,14 +512,17 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 		[dict setObject:[NSNumber numberWithInteger:(NSInteger)modelIndex] forKey:@"listIndex"];
 		[dict setObject:[NSNumber numberWithInteger:(NSInteger)iconIndex] forKey:@"iconIndex"];
 		
-		[self insertIcon:icon atIndex:&iconIndex];
 		[[FAPreferencesHandler sharedInstance] optimizedUpdateKey:title withDictionary:dict];
+		
+		// NOTE: Upon calling -addIcon:, the icon gets placed into some weird place.
+		// This is fixed by calling -insertIcon:atIndex:, yet we might be doing
+		// something which probably breaks it. It should be fixed.
+		[self insertIcon:icon atIndex:&iconIndex];
 	}
 	
 	else
 		[self insertIcon:icon atIndex:&index];
 	
-	//[[%c(SBIconController) sharedInstance] scrollToIconListAtIndex:modelIndex animate:YES];
 	[[%c(SBIconController) sharedInstance] updateCurrentIconListIndexAndVisibility];
 }
 %end
@@ -522,6 +541,30 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 %end
 
 %hook SBFolderIcon
+- (UIImage *)getIconImage:(int)flag {
+	if ([[self folder] isKindOfClass:%c(FAFolder)]) {
+		MPMediaItemCollection *collection = [(FAFolder *)[self folder] mediaCollection];
+		
+		if (![collection isKindOfClass:[MPMediaPlaylist class]]) {
+			MPMediaItem *_item = [collection representativeItem];
+			MPMediaItemArtwork *artwork = [_item valueForProperty:MPMediaItemPropertyArtwork];
+			
+			// NOTE: The size passed to -imageWithSize: does not matter at all.
+			// NOTE: This function does not exist.
+			UIImage *artworkImage = FAMakeThisImageBeLikeAnIcon([artwork imageWithSize:CGSizeMake(42, 42)]);
+			
+			if (artworkImage)
+				return artworkImage;
+		}
+		
+		return [[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/folder.png"] resizedImage:CGSizeMake(42, 42) interpolationQuality:kCGInterpolationHigh];
+	}
+	
+	return %orig;
+}
+%end
+
+/*%hook SBFolderIcon
 - (UIImage *)gridImageWithSkipping:(BOOL)skipping {
 	if ([[self folder] isKindOfClass:%c(FAFolder)]) {
 		MPMediaItemCollection *collection = [(FAFolder *)[self folder] mediaCollection];
@@ -540,7 +583,7 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	
 	return %orig;
 }
-%end
+%end*/
 
 // Thanks DHowett! (stolen from cydelete)
 %hook SBFolderIcon
@@ -591,7 +634,7 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	}
 	
 	SBFolder *rootFolder = MSHookIvar<SBFolder *>(self, "_rootFolder");
-	// TODO: This method returns id. Maybe it returns the SBIconListView object?
+	// TODO: This method returns id. Maybe it returns the SBIconList[View|Model] object?
 	[self addEmptyListViewForFolder:rootFolder];
 	return [(SBIconListView *)[rootIconLists lastObject] model];
 }
@@ -600,14 +643,11 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 - (void)commitAlbumFolders {
 	FAPreferencesHandler *handler = [FAPreferencesHandler sharedInstance];
 	
-	NSArray *titles = [handler allKeys];
-	for (NSString *title in titles) {
+	NSArray *keys = [handler allKeys];
+	for (NSDictionary *d in keys) {
 		BOOL insert = YES;
 		
-		if (![handler keyExists:title])
-			continue;
-		
-		NSDictionary *d = [handler objectForKey:title];
+		NSString *title = [d objectForKey:@"keyTitle"];
 		NSString *fake = [d objectForKey:@"fakeTitle"];
 		NSInteger list = [[d objectForKey:@"listIndex"] integerValue];
 		NSInteger icon = [[d objectForKey:@"iconIndex"] integerValue];
@@ -615,11 +655,10 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 		
 		SBIconListModel *model;
 		
-		if (list!=-1 || icon!=-1) {
+		if (list != -1 || icon != -1) {
 			model = [[self rootIconListAtIndex:list] model];
-			if (!model || [model isFull]) {
+			if (!model || [model isFull])
 				goto newmodel;
-			}
 		}
 		
 		else {
@@ -644,9 +683,9 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 		SBIconListModel *model = [iconListView model];
 		NSArray *icons = [model icons];
 		
-		for (id icon in icons) {
+		for (SBIcon *icon in icons) {
 			if ([icon isKindOfClass:%c(SBFolderIcon)]) {
-				FAFolder *folder = (FAFolder *)[icon folder];
+				FAFolder *folder = (FAFolder *)[(SBFolderIcon *)icon folder];
 				
 				if ([folder isKindOfClass:%c(FAFolder)]) {
 					NSString *iconDisplayName = [folder keyName];

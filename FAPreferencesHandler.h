@@ -1,7 +1,7 @@
 #define FALayoutPath "/var/mobile/Library/Preferences/am.theiostre.foldalbum.plist"
 
 @interface FAPreferencesHandler : NSObject {
-	NSMutableDictionary *_cache;
+	NSMutableArray *_cache;
 }
 
 + (id)sharedInstance;

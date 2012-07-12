@@ -35,6 +35,10 @@
 - (id)specifiers {
 	NSString *content_ = [[self specifier] name];
 	_contentTitle = [content_ isEqualToString:@"\u266B New"] ? @"\u266B" : content_;
+	if (!_contentTitle) {
+		[[self navigationController] popViewControllerAnimated:YES];
+		return nil;
+	}
 	
 	if (!_specifiers) {
 		PSSpecifier *grp = [PSSpecifier emptyGroupSpecifier];
@@ -113,6 +117,7 @@
 		[collection valueForProperty:MPMediaPlaylistPropertyName] :
 		[[collection representativeItem] valueForProperty:MPMediaItemPropertyAlbumTitle];
 	
+	// TODO: Random identifier check
 	if (([[[messagingCenter sendMessageAndReceiveReplyName:@"KeyExists" userInfo:[NSDictionary dictionaryWithObject:res forKey:@"Key"]] objectForKey:@"Result"] boolValue])) {
 		UIAlertView *alertView = [[[UIAlertView alloc] initWithTitle:@"FoldAlbum" message:@"There is already a folder which selected this album/playlist. Ignoring choice." delegate:nil cancelButtonTitle:@"Dismiss" otherButtonTitles:nil] autorelease];
 		[alertView show];
@@ -173,14 +178,15 @@
 - (NSArray *)loadSpecifiers {
 	NSMutableArray *ret = [NSMutableArray array];
 	
+	// TODO: Don't load anything from that plist s_s
 	NSArray *firstObjects = [self loadSpecifiersFromPlistName:@"FAPreferences" target:self];
 	[ret addObjectsFromArray:firstObjects];
 	
 	CPDistributedMessagingCenter *messagingCenter = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.server"];
-	NSArray *titles = [[messagingCenter sendMessageAndReceiveReplyName:@"AllKeys" userInfo:nil] objectForKey:@"Result"];
+	NSArray *dicts = [[messagingCenter sendMessageAndReceiveReplyName:@"AllKeys" userInfo:nil] objectForKey:@"Result"];
 	
-	for (NSString *title in titles) {
-		PSSpecifier *spec = [PSSpecifier preferenceSpecifierNamed:title target:self set:NULL get:NULL detail:objc_getClass("FAFolderSetterController") cell:PSLinkCell edit:Nil];
+	for (NSDictionary *dict in dicts) {
+		PSSpecifier *spec = [PSSpecifier preferenceSpecifierNamed:[dict objectForKey:@"keyTitle"] target:self set:NULL get:NULL detail:[FAFolderSetterController class] cell:PSLinkCell edit:Nil];
 		[ret addObject:spec];
 	}
 	

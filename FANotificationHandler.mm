@@ -69,6 +69,8 @@ static FANotificationHandler *sharedInstance_ = nil;
 	return [NSDictionary dictionaryWithObject:allKeys forKey:@"Result"];
 }
 
+// FIXME: When relayouting, there seems to be an odd bug.
+// Maybe check out how Apple *fully* does its relayouting.
 // Thanks BigBoss! (stolen from libhide)
 - (void)relayout {
 	SBIconModel *iconModel = [objc_getClass("SBIconModel") sharedInstance];
