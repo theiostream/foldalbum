@@ -22,6 +22,7 @@ And without the projects:
 
 And it contains:
 -- Part of the MPMediaItemCollection category by Jamin Guy (from JGMediaPickerController)
+-- Part of the UIImage resizing category by Trevor Harmon
 
 Also, I needed to browse those to solve stupid problems:
 -- StackOverflow
