@@ -18,4 +18,8 @@ if [ -e /var/mobile/Library/Preferences/am.theiostre.foldalbum.plist ]; then
 		mv -f /var/mobile/Library/Preferences/am.theiostre.foldalbum.plist /Library/Application\ Support/FoldAlbum/_oldplist.plist
 		touch /Library/Application\ Support/FoldAlbum/_patched_plist
 	fi
+
+else
+	touch /Library/Application\ Support/FoldAlbum/_patched_plist
+
 fi
