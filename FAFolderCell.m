@@ -4,6 +4,12 @@
 
 #import "FAFolderCell.h"
 
+@interface UIDevice (blah_fuck)
+- (BOOL)isWildcat;
+@end
+
+#define isiPad() ([UIDevice instancesRespondToSelector:@selector(isWildcat)] && [[UIDevice currentDevice] isWildcat])
+
 // FIXME: I repeat this function declaration here and at FAMediaPickerController.
 static UIImage *UIImageResize(UIImage *image, CGSize newSize) {
     UIGraphicsBeginImageContextWithOptions(newSize, NO, 0.0);
@@ -52,9 +58,10 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
 
 + (CGFloat)_widthForProperty:(NSString *)property {
 	if ([property isEqualToString:MPMediaItemPropertyPlaybackDuration] || [property isEqualToString:MPMediaItemPropertyPlayCount])
-		return 60.f;
+		// FIXME: Why the fuck?
+		return isiPad() ? 105.f : 65.f;
 	else
-		return 120.f;
+		return isiPad() ? 240.f : 120.f;
 }
 
 - (id)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
@@ -68,7 +75,7 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
 		[[self contentView] addSubview:_label];
 		
 		CGFloat wd = [FAFolderCell _widthForProperty:_property];
-		_infoLabel = [FAFolderCell _makeLabelWithRect:CGRectMake(320-wd+10, 8, 0, 20)];
+		_infoLabel = [FAFolderCell _makeLabelWithRect:CGRectMake((isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd+10, 8, 0, 20)];
 		[[self contentView] addSubview:_infoLabel];
 		
 		__imageView = [[[UIImageView alloc] initWithFrame:CGRectMake(10, 2.5, 32, 32)] autorelease];
@@ -82,7 +89,7 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
     	[_speaker setHidden:YES];
     	[self addSubview:_speaker];
 		
-		CGFloat wid = 260;
+		CGFloat wid = (isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd;
 		CGMutablePathRef path = CGPathCreateMutable();
 		CGPathMoveToPoint(path, NULL, wid, [self bounds].origin.y);
 		CGPathAddLineToPoint(path, NULL, wid, [self bounds].origin.y+38.f);
@@ -120,22 +127,22 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
     
     CGFloat wd = [FAFolderCell _widthForProperty:_property];
 	CGMutablePathRef path = CGPathCreateMutable();
-	CGPathMoveToPoint(path, NULL, 320-wd, [self bounds].origin.y);
-	CGPathAddLineToPoint(path, NULL, 320-wd, [self bounds].origin.y+38.f);
+	CGPathMoveToPoint(path, NULL, (isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd, [self bounds].origin.y);
+	CGPathAddLineToPoint(path, NULL, (isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd, [self bounds].origin.y+38.f);
     
     [_shape setPath:path];
     
-    [_label setFrame:(CGRect){_label.frame.origin, {320-(wd+50), _label.frame.size.height}}];
-    [_label setFont:(wd==60.f ? [FAFolderCell labelFont] : [FAFolderCell smallLabelFont])];
-    [_infoLabel setFrame:CGRectMake(320-wd+10, 8, wd-15, 20)];
+    [_label setFrame:(CGRect){_label.frame.origin, {(isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-(wd+50), _label.frame.size.height}}];
+    [_label setFont:(wd==65.f||isiPad() ? [FAFolderCell labelFont] : [FAFolderCell smallLabelFont])];
+    [_infoLabel setFrame:CGRectMake((isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd+10, 8, wd-15, 20)];
 }
 
 - (void)_changeDetailAnimated {
 	CGFloat wd = [FAFolderCell _widthForProperty:_property];
 			
 	CGMutablePathRef path = CGPathCreateMutable();
-	CGPathMoveToPoint(path, NULL, 320-wd, [self bounds].origin.y);
-	CGPathAddLineToPoint(path, NULL, 320-wd, [self bounds].origin.y+38.f);
+	CGPathMoveToPoint(path, NULL, (isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd, [self bounds].origin.y);
+	CGPathAddLineToPoint(path, NULL, (isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd, [self bounds].origin.y+38.f);
 	
 	[_shape setPath:path];
 	
@@ -143,11 +150,11 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
 	CGPathRelease(path);
 	
 	[UIView animateWithDuration:.1f animations:^{
-		[_label setFrame:(CGRect){_label.frame.origin, {320-(wd+50), _label.frame.size.height}}];
-		[_label setFont:(wd==60.f ? [FAFolderCell labelFont] : [FAFolderCell smallLabelFont])];
+		[_label setFrame:(CGRect){_label.frame.origin, {(isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-(wd+50), _label.frame.size.height}}];
+		[_label setFont:(wd==65.f||isiPad() ? [FAFolderCell labelFont] : [FAFolderCell smallLabelFont])];
 		
 		[_infoLabel setAlpha:0.f];
-		[_infoLabel setFrame:CGRectMake(320-wd+10, 8, wd-15, 20)];
+		[_infoLabel setFrame:CGRectMake((isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd+10, 8, wd-15, 20)];
 		[_infoLabel setText:[self valueForProperty]];
 		[_infoLabel setAlpha:1.f];
 	}];

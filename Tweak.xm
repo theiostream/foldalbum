@@ -3,12 +3,18 @@
 	(user related ones are in a note inside Notes.app on my iPhone)
 	
 	- libpsicons
+	- libmicon
 	
+	- can we move the view-related hooks to other file?
 	-- better FAFolder
 	-- work on category for MPMediaCollection to make playlist vs. album easier
 	-- work out copied functions
 	-- FAMediaPickerController sucks.
 	--- increase scrolling performance.
+	
+	CYKEY GO FIX THESE.
+	FR0ST DO THAT TOO IF YOU ARE AVAILABLE.
+	I NEED TO FINISHED ALL PERSONAL PROJECTS.
 */
 
 // I used to be a good developer.
@@ -25,11 +31,20 @@
 #import "FAPreferencesHandler.h"
 #import "FANotificationHandler.h"
 #import "UIImage+Resize.h"
+#import "UIImage+RoundedCorner.h"
+#import "UIImage+ProportionalFill.h"
 #import "FACalloutView.h"
 
 /*%%%%%%%%%%%
 %% Macros
 %%%%%%%%%%%*/
+
+@interface UIDevice (FolderAlbums_iPad)
+- (BOOL)isWildcat;
+@end
+
+// From IconSupport; I am on a BIG hurry sorry world.
+#define isiPad() ([UIDevice instancesRespondToSelector:@selector(isWildcat)] && [[UIDevice currentDevice] isWildcat])
 
 #define SBLocalizedString(key) \
 	[[NSBundle mainBundle] localizedStringForKey:key value:@"None" table:@"SpringBoard"]
@@ -55,14 +70,33 @@ static CGRect groupFrame;
 %% Functions
 %%%%%%%%%%%*/
 
-void _FADrawLineAtPath(UIView *view, CGPathRef path) {
-	CAShapeLayer *shape = [CAShapeLayer layer];
-	[shape setLineWidth:1.f];
-	[shape setLineCap:kCALineCapRound];
-	[shape setStrokeColor:[UIColorFromHexWithAlpha(0xFFFFFF, 0.37) CGColor]];
-	[shape setPath:path];
+// This is the best damn resizing method ever.
+// Really though, Trevor Harmon's category makes the image blur.
+// Yay for StackOverflow answer!
+static UIImage *UIImageResize(UIImage *image, CGSize newSize) {
+	UIGraphicsBeginImageContextWithOptions(newSize, NO, 0.0);
+    [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
+    UIImage *newImage = UIGraphicsGetImageFromCurrentImageContext();    
+    UIGraphicsEndImageContext();
+    return newImage;
+}
+
+// Yet another StackOverflow entry!
+// Credits go to Maximus for finding that one out! :P
+static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
+	UIGraphicsBeginImageContextWithOptions([image size], NO, 0.0);
+	CGContextRef context = UIGraphicsGetCurrentContext();
 	
-	[[view layer] addSublayer:shape];
+	CGRect rect = CGRectMake(0, 0, [image size].width, [image size].height+1);
+	CGPathRef clippingPath = [[UIBezierPath bezierPathWithRoundedRect:rect cornerRadius:cornerRadius] CGPath];
+	CGContextAddPath(context, clippingPath);
+	CGContextClip(context);
+	
+	[image drawInRect:rect];
+	UIImage *newImage = UIGraphicsGetImageFromCurrentImageContext();
+	
+	UIGraphicsEndImageContext();
+	return newImage;
 }
 
 /*%%%%%%%%%%%
@@ -78,7 +112,8 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	NSMutableArray *ret = [NSMutableArray array];
 	SBIcon *empty = [[[%c(SBIcon) alloc] init] autorelease];
 	
-	for (int i=0; i<11; i++)
+	int iconsTarget = isiPad() ? 15 : 11;
+	for (int i=0; i<iconsTarget; i++)
 		[ret addObject:empty];
 		
 	return ret;
@@ -136,19 +171,44 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	SBFolder *folder = [self folder];
 	MPMediaItemCollection *collection = [(FAFolder *)folder mediaCollection];
 	
-	UILabel *&groupLabel = MSHookIvar<UILabel *>(self, "_label");
-	[groupLabel setFrame:(CGRect){{groupLabel.frame.origin.x-7, groupLabel.frame.origin.y}, {230, 20}}];
+	UILabel *&groupLabel_ = MSHookIvar<UILabel *>(self, "_label");
+	[groupLabel_ setHidden:YES];
+	
+	UILabel *groupLabel = [[[UILabel alloc] initWithFrame:[groupLabel_ frame]] autorelease];
+	[groupLabel setFont:[groupLabel_ font]];
+	[groupLabel setBackgroundColor:[UIColor clearColor]];
+	[groupLabel setTextColor:[groupLabel_ textColor]];
+	[groupLabel setText:[groupLabel_ text]];
+	[[groupLabel layer] setShadowOpacity:[[groupLabel_ layer] shadowOpacity]];
+	[[groupLabel layer] setShadowRadius:[[groupLabel_ layer] shadowRadius]];
+	[[groupLabel layer] setShadowOffset:[[groupLabel_ layer] shadowOffset]];
+	[[groupLabel layer] setShadowColor:[[groupLabel_ layer] shadowColor]];
+	[[groupLabel layer] setShadowPath:[[groupLabel_ layer] shadowPath]];
+	
+	CGRect groupRect = isiPad() ?
+		(CGRect){{20, groupLabel.frame.origin.y}, {648, 22}} :
+		(CGRect){{groupLabel.frame.origin.x-7, groupLabel.frame.origin.y}, {230, 20}};
+	
+	[groupLabel setFrame:groupRect];
 	groupFrame = [groupLabel frame];
 	[groupLabel setFont:[[groupLabel font] fontWithSize:20.f]];
 	[groupLabel setTextAlignment:UITextAlignmentLeft];
 	[groupLabel setAdjustsFontSizeToFitWidth:YES];
 	[groupLabel setMinimumFontSize:16.f];
 	
-	CGRect subtitleLabel = CGRectMake(groupLabel.frame.origin.x, groupLabel.frame.origin.y+23, 241, 16);
+	CGPoint subtitlePoint = CGPointMake(groupLabel.frame.origin.x, groupLabel.frame.origin.y+23);
+	CGSize subtitleSize = isiPad() ?
+		CGSizeMake(668, 16) :
+		CGSizeMake(230, 16);
+	
+	CGRect subtitleLabel = (CGRect){subtitlePoint, subtitleSize};
+	
 	if ([[groupLabel font] pointSize] < 20.f) {
-		[groupLabel setFrame:(CGRect){{groupLabel.frame.origin.x, groupLabel.frame.origin.y+3}, {groupLabel.frame.size.width, [[groupLabel font] pointSize]}}];
+		[groupLabel setFrame:(CGRect){{groupLabel.frame.origin.x, groupLabel.frame.origin.y}, {groupLabel.frame.size.width, [[groupLabel font] pointSize]}}];
 		subtitleLabel.origin.y -= (subtitleLabel.origin.y-[[groupLabel font] pointSize]);
 	}
+	
+	[self addSubview:groupLabel];
 	
 	UITextField *&textField = MSHookIvar<UITextField *>(self, "_textField");
 	[textField setPlaceholder:[(FAFolder *)[self folder] keyName]];
@@ -173,7 +233,7 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	else
 		subtitleLabel.origin.y -= 20;
 	
-	UIView *controllerContent = [[[UIView alloc] initWithFrame:CGRectMake(255, groupLabel.bounds.origin.y+5, 60, 25)] autorelease];
+	UIView *controllerContent = [[[UIView alloc] initWithFrame:CGRectMake((isiPad() ? 683 : 255), groupLabel.bounds.origin.y+5, 60, 25)] autorelease];
 	UIImage *musicImage = [[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/music.png"] resizedImage:CGSizeMake(25, 25) interpolationQuality:kCGInterpolationHigh];
 	UIImage *speakerImage = [[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/speaker.png"] resizedImage:CGSizeMake(22, 22) interpolationQuality:kCGInterpolationHigh];
 	
@@ -191,19 +251,17 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	[controllerContent addSubview:speakerButton];
 	[self addSubview:controllerContent];
 	
-	CGFloat hei = subtitleLabel.origin.y+25;
-	CGMutablePathRef path = CGPathCreateMutable();
-	CGPathMoveToPoint(path, NULL, 0, hei);
-	CGPathAddLineToPoint(path, NULL, 320, hei);
-	_FADrawLineAtPath(self, path);
-	CGPathRelease(path);
-	
-	CGRect tableFrame = CGRectMake(0, subtitleLabel.origin.y+25, 320, self.bounds.size.height-(subtitleLabel.origin.y+25));
+	CGRect tableFrame = CGRectMake((isiPad() ? 20 : -1), subtitleLabel.origin.y+25, (isiPad() ? UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 728 : 984 : 322), self.bounds.size.height-(subtitleLabel.origin.y+25));
 	UITableView *dataTable = [[[UITableView alloc] initWithFrame:tableFrame style:UITableViewStylePlain] autorelease];
 	[dataTable setDelegate:self];
 	[dataTable setDataSource:self];
 	[dataTable setBackgroundColor:[UIColor clearColor]];
 	[dataTable setSeparatorColor:UIColorFromHexWithAlpha(0xFFFFFF, 0.37)];
+	[dataTable setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
+	
+	[[dataTable layer] setBorderWidth:.8f];
+	[[dataTable layer] setBorderColor:[UIColorFromHexWithAlpha(0xFFFFFF, 0.37) CGColor]];
+	
 	[self addSubview:dataTable];
 	
 	UISwipeGestureRecognizer *rig = [[[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(nextItem:)] autorelease];
@@ -260,7 +318,7 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	[alert placeQuitButtonInView:self];
 	
 	[alert setCenteredView:content animated:YES];
-	[alert setAnchorPoint:CGPointMake(267.5, 25) boundaryRect:[[UIScreen mainScreen] applicationFrame] animate:YES];
+	[alert setAnchorPoint:CGPointMake((isiPad() ? 695.5 : 267.5), 25) boundaryRect:[[UIScreen mainScreen] applicationFrame] animate:YES];
 	[self addSubview:alert];
 }
 
@@ -359,13 +417,13 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	g_content = [btn superview];
 	[UIView animateWithDuration:0.2f animations:^{
 		CGRect fr = [g_content frame];
-		fr.origin.x -= 20;
+		fr.origin.x -= (isiPad() ? 13 : 20);
 		[g_content setFrame:fr];
 	}];
 	
 	MPVolumeView *slider = [[[MPVolumeView alloc] initWithFrame:CGRectMake(0, 0, 200.0, 20)] autorelease];
 	[alert setCenteredView:slider animated:YES];
-	[alert setAnchorPoint:CGPointMake(287.5, 25) boundaryRect:[[UIScreen mainScreen] applicationFrame] animate:YES];
+	[alert setAnchorPoint:CGPointMake((isiPad() ? 715.5 : 287.5), 25) boundaryRect:[[UIScreen mainScreen] applicationFrame] animate:YES];
 	[self addSubview:alert];
 }
 
@@ -374,7 +432,7 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 	if (fromVolume) {
 		[UIView animateWithDuration:0.2f animations:^{
 			CGRect fr = [g_content frame];
-			fr.origin.x += 20;
+			fr.origin.x += (isiPad() ? 13 : 20);
 			[g_content setFrame:fr];
 		}];
 	}
@@ -541,49 +599,30 @@ void _FADrawLineAtPath(UIView *view, CGPathRef path) {
 %end
 
 %hook SBFolderIcon
-- (UIImage *)getIconImage:(int)flag {
-	if ([[self folder] isKindOfClass:%c(FAFolder)]) {
-		MPMediaItemCollection *collection = [(FAFolder *)[self folder] mediaCollection];
-		
-		if (![collection isKindOfClass:[MPMediaPlaylist class]]) {
-			MPMediaItem *_item = [collection representativeItem];
-			MPMediaItemArtwork *artwork = [_item valueForProperty:MPMediaItemPropertyArtwork];
-			
-			// NOTE: The size passed to -imageWithSize: does not matter at all.
-			// NOTE: This function does not exist.
-			UIImage *artworkImage = FAMakeThisImageBeLikeAnIcon([artwork imageWithSize:CGSizeMake(42, 42)]);
-			
-			if (artworkImage)
-				return artworkImage;
-		}
-		
-		return [[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/folder.png"] resizedImage:CGSizeMake(42, 42) interpolationQuality:kCGInterpolationHigh];
-	}
-	
-	return %orig;
-}
-%end
-
-/*%hook SBFolderIcon
+// TODO: Improve this. I don't know how, just do.
 - (UIImage *)gridImageWithSkipping:(BOOL)skipping {
 	if ([[self folder] isKindOfClass:%c(FAFolder)]) {
 		MPMediaItemCollection *collection = [(FAFolder *)[self folder] mediaCollection];
 		
+		CGFloat fr = isiPad() ? 55 : 45;
+		CGSize iconSize = CGSizeMake(fr, fr);
+		
 		if (![collection isKindOfClass:[MPMediaPlaylist class]]) {
 			MPMediaItem *_item = [collection representativeItem];
 			MPMediaItemArtwork *artwork = [_item valueForProperty:MPMediaItemPropertyArtwork];
-			UIImage *artworkImage = [[artwork imageWithSize:CGSizeMake(42, 42)] resizedImage:CGSizeMake(42, 42) interpolationQuality:kCGInterpolationHigh];
 			
+			UIImage *artworkImage = [artwork imageWithSize:iconSize];
+
 			if (artworkImage)
-				return artworkImage;
+				return UIImageRoundCorners(UIImageResize(artworkImage, iconSize), 8.f);
 		}
-		
-		return [[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/folder.png"] resizedImage:CGSizeMake(42, 42) interpolationQuality:kCGInterpolationHigh];
+
+		return UIImageResize([UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/folder.png"], iconSize);
 	}
-	
+
 	return %orig;
 }
-%end*/
+%end
 
 // Thanks DHowett! (stolen from cydelete)
 %hook SBFolderIcon
