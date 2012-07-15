@@ -1,26 +1,30 @@
-/*
-	Dev-related TODOs:
-	(user related ones are in a note inside Notes.app on my iPhone)
+/**
+	Tweak.xm
 	
-	- libpsicons
-	- libmicon
-	
-	- can we move the view-related hooks to other file?
-	-- better FAFolder
-	-- work on category for MPMediaCollection to make playlist vs. album easier
-	-- work out copied functions
-	-- FAMediaPickerController sucks.
-	--- increase scrolling performance.
-	
-	CYKEY GO FIX THESE.
-	FR0ST DO THAT TOO IF YOU ARE AVAILABLE.
-	I NEED TO FINISHED ALL PERSONAL PROJECTS.
-*/
+	FoldMusic
+  	version 1.2.0, July 15th, 2012
 
-// I used to be a good developer.
-// Then I started using goto.
+  Copyright (C) 2012 theiostream
 
-// FAPreferences was an accidental name.
+  This software is provided 'as-is', without any express or implied
+  warranty.  In no event will the authors be held liable for any damages
+  arising from the use of this software.
+
+  Permission is granted to anyone to use this software for any purpose,
+  including commercial applications, and to alter it and redistribute it
+  freely, subject to the following restrictions:
+
+  1. The origin of this software must not be misrepresented; you must not
+     claim that you wrote the original software. If you use this software
+     in a product, an acknowledgment in the product documentation would be
+     appreciated but is not required.
+  2. Altered source versions must be plainly marked as such, and must not be
+     misrepresented as being the original software.
+  3. This notice may not be removed or altered from any source distribution.
+
+  theiostream
+  matoe@matoe.co.cc
+**/
 
 /*%%%%%%%%%%%
 %% Imports
@@ -30,10 +34,8 @@
 #import "FAFolderCell.h"
 #import "FAPreferencesHandler.h"
 #import "FANotificationHandler.h"
-#import "UIImage+Resize.h"
-#import "UIImage+RoundedCorner.h"
-#import "UIImage+ProportionalFill.h"
 #import "FACalloutView.h"
+#import "UIImage+Resize.h"
 
 /*%%%%%%%%%%%
 %% Macros

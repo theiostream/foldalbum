@@ -3,7 +3,7 @@ Name: FoldMusic
 Depends: mobilesubstrate, com.chpwn.iconsupport, preferenceloader
 Version: 0.0.1
 Architecture: iphoneos-arm
-Description: An awesome MobileSubstrate tweak!
+Description: Folders which contain music.
 Maintainer: theiostream
 Author: theiostream
 Section: Tweaks

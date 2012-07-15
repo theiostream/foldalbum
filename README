@@ -1,30 +1,27 @@
 FoldMusic.
-by Ariel Aouizerate and theiostream.
+by Ariel Aouizerate & theiostream.
 
-This project could not be here without these awesome people:
--- Christina Brooks
--- David Murray
--- Dustin Howett
--- Guillermo Morán
--- Max Shavrick
--- Nolan Welser
--- Optimo
+##### About
+FoldMusic is a MobileSubstrate extension for iOS which allows you to create folders on the homescreen like the icon folders, which contain instead of icons, a list of songs.
 
-And without the projects:
--- btedev's AudioMeetupDemos (MPMusicPlayerDemo)
--- DHowett's CyDelete
--- chpwn+ashikase+Sakurina's IconSupport
--- BigBoss's libhide
--- theiostream's LumiWidgets
--- rpetrich's RunningIndicator
--- theiostream's SearchCommands
--- qwertyoruiop+Maximus's UISettings
+The folders are created by users in a preference panel and can be formed from either an album or from a playlist.
 
-And it contains:
--- Part of the MPMediaItemCollection category by Jamin Guy (from JGMediaPickerController)
--- The UIImage+Resize category by Trevor Harmon (http://vocaro.com/trevor/blog/2009/10/12/resize-a-uiimage-the-right-way/)
+##### On open-source
+Even though this is a paid product sold for $1.5 dollars in the Cydia Store, I decided to dare the standard model of how tweaks are distributed and see if I will manage to get any contributors to this project (that's quite needed!)
 
-Also, I needed to browse those to solve stupid problems:
--- StackOverflow
--- GitHub
--- Apple Mailing Lists
+This software is licensed under the zlib license (see below), which I guess covers this software's rights nicely. Please respect it (or at least read it).
+
+##### Contributing
+I gladly take extensively tested patches to FoldMusic in the form of a pull request. Although, if you find yourself in a situation where your patch must be distributed in the form of another package, the following instructions must be followed:
+
+1. DO NOT in any way sell this software or release a free alternative with minor changes to the project.
+2. Change the name and the bundle identifier of this project and make it conflict with the original package.
+3. Do not in any way use the authors of this project as a mean to endorse your patch.
+
+IF THESE INSTRUCTIONS ARE NOT FOLLOWED I *WILL* TERMINATE THIS PROJECT.
+
+##### Licensing
+This project is licensed under the zlib license (http://zlib.net/zlib_license.html). A redistributable copy of the license file can be found at the LICENSE file.
+
+##### Credits
+A CREDITS file can be found in this project with all the people who contributed to the project.
