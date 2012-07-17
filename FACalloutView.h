@@ -26,7 +26,7 @@
   matoe@matoe.co.cc
 **/
 
-#import <UIKit2/UICalloutView.h>
+#import "UICalloutView.h"
 
 @protocol FACalloutViewDelegate;
 
