@@ -11,12 +11,18 @@ Even though this is a paid product sold for $1.5 dollars in the Cydia Store, I d
 
 This software is licensed under the zlib license (see below), which I guess covers this software's rights nicely. Please respect it (or at least read it).
 
+##### Compiling
+1. Delete $THEOS/include/MediaPlayer or set those up right. Go for the second option.
+2. make
+
+ANY warnings in this project is due to a difference in my environment from yours. Please do not submit patches which ONLY adapt this project to your header set. If you had to do any changes like such to be able to compile, I will accept the patch but WILL modify the source to be compilable in my environment.
+
 ##### Contributing
 I gladly take extensively tested patches to FoldMusic in the form of a pull request. Although, if you find yourself in a situation where your patch must be distributed in the form of another package, the following instructions must be followed:
 
-1. DO NOT in any way sell this software or release a free alternative with minor changes to the project.
-2. Change the name and the bundle identifier of this project and make it conflict with the original package.
-3. Do not in any way use the authors of this project as a mean to endorse your patch.
+1. Do not in any way release or sell a minorly altered patch to this project.
+2. Make it clear it is based on work by the original authors without endorsing purposes.
+3. Change the name and the bundle identifier of this project and make it conflict with the original package.
 
 IF THESE INSTRUCTIONS ARE NOT FOLLOWED I *WILL* TERMINATE THIS PROJECT.
 
