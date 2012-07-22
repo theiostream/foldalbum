@@ -59,6 +59,7 @@ static NSUInteger idx = 0;
 
 static char _mediaCollectionKey;
 static char _keyNameKey;
+static char _labelKey;
 
 static UIView *g_content = nil;
 static BOOL fromVolume = NO;
@@ -154,17 +155,43 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	return MSHookIvar<FAFolder *>(self, "_folder");
 }
 
-- (void)textFieldDidEndEditing:(id)textField {
+%new(@@:)
+- (UILabel *)groupLabel {
+	return objc_getAssociatedObject(self, &_labelKey);
+}
+
+// Won't change anything, but can probably aboid future bugs
+// and adds preliminary support for other planned features.
+/*- (void)textFieldDidBeginEditing:(UITextField *)textField {
+	UILabel *groupLabel = [self groupLabel];
+	[groupLabel setHidden:YES];
+	
+	%orig;
+}*/
+
+- (void)textFieldDidEndEditing:(UITextField *)textField {
+	UILabel *groupLabel = [self groupLabel];
+	NSString *key = [(FAFolder *)[self folder] keyName];
+	NSString *res = [[textField text] isEqualToString:@""] ? key : [textField text];	
+	
+	NSDictionary *update = [NSDictionary dictionaryWithObject:res forKey:@"fakeTitle"];
+	[[FAPreferencesHandler sharedInstance] optimizedUpdateKey:key withDictionary:update];
+	
+	// This is needed in case we get @"" from the text field.
+	[[self folder] setDisplayName:res];
+	
+	NSLog(@"[FoldMusic] res is %@", res);
+	[groupLabel setText:res];
+	//[groupLabel setFrame:groupFrame];
+	
+	%orig;
+}
+
+- (void)setIsEditing:(BOOL)editing animated:(BOOL)animated {
 	%orig;
 	
-	if ([[textField text] isEqualToString:@""])
-		[textField setText:[(FAFolder *)[self folder] keyName]];
-	
-	NSDictionary *update = [NSDictionary dictionaryWithObject:[textField text] forKey:@"fakeTitle"];
-	[[FAPreferencesHandler sharedInstance] optimizedUpdateKey:[(FAFolder *)[self folder] keyName] withDictionary:update];
-	
-	UILabel *&groupLabel = MSHookIvar<UILabel *>(self, "_label");
-	[groupLabel setFrame:groupFrame];
+	UILabel *groupLabel = [self groupLabel];
+	[groupLabel setHidden:editing];
 }
 
 - (void)setIconListView:(UIView *)view {
@@ -175,17 +202,17 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	
 	UILabel *&groupLabel_ = MSHookIvar<UILabel *>(self, "_label");
 	[groupLabel_ setHidden:YES];
+	// TODO: Find somewhere to release this unused label.
 	
 	UILabel *groupLabel = [[[UILabel alloc] initWithFrame:[groupLabel_ frame]] autorelease];
 	[groupLabel setFont:[groupLabel_ font]];
 	[groupLabel setBackgroundColor:[UIColor clearColor]];
 	[groupLabel setTextColor:[groupLabel_ textColor]];
 	[groupLabel setText:[groupLabel_ text]];
-	[[groupLabel layer] setShadowOpacity:[[groupLabel_ layer] shadowOpacity]];
-	[[groupLabel layer] setShadowRadius:[[groupLabel_ layer] shadowRadius]];
-	[[groupLabel layer] setShadowOffset:[[groupLabel_ layer] shadowOffset]];
-	[[groupLabel layer] setShadowColor:[[groupLabel_ layer] shadowColor]];
-	[[groupLabel layer] setShadowPath:[[groupLabel_ layer] shadowPath]];
+	// TODO: Shadows!
+	
+	if (MSHookIvar<BOOL>(self, "_isEditing"))
+		[groupLabel setHidden:YES];
 	
 	CGRect groupRect = isiPad() ?
 		(CGRect){{20, groupLabel.frame.origin.y}, {648, 22}} :
@@ -211,6 +238,7 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	}
 	
 	[self addSubview:groupLabel];
+	objc_setAssociatedObject(self, &_labelKey, groupLabel, OBJC_ASSOCIATION_RETAIN);
 	
 	UITextField *&textField = MSHookIvar<UITextField *>(self, "_textField");
 	[textField setPlaceholder:[(FAFolder *)[self folder] keyName]];
@@ -536,6 +564,11 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	
 	end:
 	[tableView deselectRowAtIndexPath:indexPath animated:YES];
+}
+
+- (void)dealloc {
+	objc_removeAssociatedObjects(self);
+	%orig;
 }
 %end
 

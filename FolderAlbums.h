@@ -52,6 +52,7 @@
 
 @interface FAFolderView : SBFolderView <UITableViewDelegate, UITableViewDataSource, FACalloutViewDelegate>
 - (FAFolder *)folder;
+- (UILabel *)groupLabel;
 - (NSArray *)itemKeys;
 @end
 
