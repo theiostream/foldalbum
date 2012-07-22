@@ -4,7 +4,7 @@
 // No warranty is expressed or implied.
 
 // Extends the UIImage class to support resizing/cropping
-@interface UIImage (Resize)
+@interface UIImage (FoldMusic_Resize)
 - (UIImage *)croppedImage:(CGRect)bounds;
 - (UIImage *)resizedImage:(CGSize)newSize
      interpolationQuality:(CGInterpolationQuality)quality;

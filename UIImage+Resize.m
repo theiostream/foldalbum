@@ -5,12 +5,8 @@
 
 #import "UIImage+Resize.h"
 
-static void shut_up_compiler() {
-	return;
-}
-
 // Private helper methods
-@interface UIImage ()
+@interface UIImage (FoldMusic_Resize_Private)
 - (UIImage *)resizedImage:(CGSize)newSize
                 transform:(CGAffineTransform)transform
            drawTransposed:(BOOL)transpose
@@ -18,7 +14,7 @@ static void shut_up_compiler() {
 - (CGAffineTransform)transformForOrientation:(CGSize)newSize;
 @end
 
-@implementation UIImage (Resize)
+@implementation UIImage (FoldMusic_Resize)
 
 // Returns a copy of this image that is cropped to the given bounds.
 // The bounds will be adjusted using CGRectIntegral.
@@ -185,7 +181,7 @@ static void shut_up_compiler() {
             transform = CGAffineTransformScale(transform, -1, 1);
             break;
         default:
-        	shut_up_compiler();
+        	break;
     }
     
     return transform;
