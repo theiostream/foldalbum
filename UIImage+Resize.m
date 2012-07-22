@@ -165,7 +165,7 @@
             transform = CGAffineTransformRotate(transform, -M_PI_2);
             break;
         default:
-        	shut_up_compiler();
+        	break;
 	}
 	
 	switch (self.imageOrientation) {
