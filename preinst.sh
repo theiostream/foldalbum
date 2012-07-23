@@ -46,6 +46,7 @@ if [ -e /var/mobile/Library/Preferences/am.theiostre.foldalbum.plist ]; then
 	fi
 
 else
+	mkdir /Library/Application\ Support/FoldAlbum
 	touch /Library/Application\ Support/FoldAlbum/_patched_plist
 
 fi
