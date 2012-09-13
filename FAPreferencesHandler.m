@@ -55,7 +55,12 @@ static FAPreferencesHandler *sharedInstance_ = nil;
 		}*/
 		
 		id cache = [FALayoutDict() objectForKey:@"FAFolderCache"];
-		_cache = [[NSMutableArray arrayWithArray:cache] retain];
+		if (![cache isKindOfClass:[NSArray class]]) {
+			NSLog(@"[FoldMusic] Failure. Deleting your plist.");
+			[[NSFileManager defaultManager] removeItemAtPath:@FALayoutPath error:NULL];
+			_cache = [[NSMutableArray array] retain];
+		}
+		else _cache = [[NSMutableArray arrayWithArray:cache] retain];
 	}
 
 	return self;
@@ -67,8 +72,9 @@ static FAPreferencesHandler *sharedInstance_ = nil;
 }
 
 - (BOOL)keyExists:(NSString *)key {
-	for (NSDictionary *dict in _cache) {
-		if ([[dict objectForKey:@"keyTitle"] isEqualToString:key])
+	NSUInteger count = [_cache count];
+	for (NSUInteger i=0; i<count; i++) {
+		if ([[[_cache objectAtIndex:i] objectForKey:@"keyTitle"] isEqualToString:key])
 			return YES;
 	}
 
@@ -82,10 +88,11 @@ static FAPreferencesHandler *sharedInstance_ = nil;
 - (id)objectForKey:(NSString *)key {
 	if (![self keyExists:key])
 		return nil;
-
-	for (NSDictionary *dict in _cache) {
-		if ([[dict objectForKey:@"keyTitle"] isEqualToString:key])
-			return dict;
+	
+	NSUInteger count = [_cache count];
+	for (NSUInteger i=0; i<count; i++) {
+		if ([[[_cache objectAtIndex:i] objectForKey:@"keyTitle"] isEqualToString:key])
+			return [_cache objectAtIndex:i];
 	}
 
 	return nil;
@@ -110,22 +117,24 @@ static FAPreferencesHandler *sharedInstance_ = nil;
 
 - (void)optimizedUpdateKey:(NSString *)key withDictionary:(NSDictionary *)dict {
 	NSArray *keys = [dict allKeys];
+	NSUInteger count = [keys count];
 
 	NSDictionary *_tgt = [self objectForKey:key];
 	if (!_tgt) return;
 
 	NSMutableDictionary *tgt = [NSMutableDictionary dictionaryWithDictionary:_tgt];
-	for (NSString *k in keys)
-		[tgt setObject:[dict objectForKey:k] forKey:k];
+	for (NSUInteger i=0; i<count; i++)
+		[tgt setObject:[dict objectForKey:[keys objectAtIndex:i]] forKey:[keys objectAtIndex:i]];
 
 	[self updateKey:key withDictionary:tgt];
 }
 
 - (void)deleteKey:(NSString *)key {
 	NSDictionary *obj;
-	for (NSDictionary *dict in _cache) {
-		if ([[dict objectForKey:@"keyTitle"] isEqualToString:key]) {
-			obj = dict;
+	NSUInteger count = [_cache count];
+	for (NSUInteger i=0; i<count; i++) {
+		if ([[[_cache objectAtIndex:i] objectForKey:@"keyTitle"] isEqualToString:key]) {
+			obj = [_cache objectAtIndex:i];
 			break;
 		}
 	}

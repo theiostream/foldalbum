@@ -30,6 +30,21 @@
 #import <AppSupport/CPDistributedMessagingCenter.h>
 #import "FACalloutView.h"
 
+@interface SBApplication : NSObject
+@end
+
+@interface SBApplicationController : NSObject
++ (id)sharedInstance;
+- (SBApplication *)applicationWithDisplayIdentifier:(NSString *)displayIdentifier;
+@end
+
+@interface SBMediaController : NSObject
++ (BOOL)applicationCanBeConsideredNowPlaying:(SBApplication *)playing;
+@end
+
+@interface SBFolderTitleLabel : UILabel
+@end
+
 @interface ISIconSupport : NSObject
 + (id)sharedInstance;
 - (BOOL)addExtension:(NSString *)extension;
@@ -118,4 +133,8 @@
 - (void)noteIconStateChangedExternally;
 - (void)relayout;
 - (void)setVisibilityOfIconsWithVisibleTags:(NSSet *)arg1 hiddenTags:(NSSet *)arg2;
+@end
+
+@interface MPDetailSlider : UISlider
+@property(assign, nonatomic, getter=isActive) BOOL active;
 @end

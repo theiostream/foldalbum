@@ -26,11 +26,15 @@
   matoe@matoe.co.cc
 **/
 
-// TODO: Use scoped pools where needed.
+// ?TODO: Use scoped pools where needed.
 // foldalbumd! Please destroy this and start using SBMediaController!
 
 #import <MediaPlayer/MediaPlayer.h>
 #import <AppSupport/CPDistributedMessagingCenter.h>
+
+@interface MPMusicPlayerController (FAPrivate_)
+- (MPMediaQuery *)queueAsQuery;
+@end
 
 @interface FADaemonNotificationHandler : NSObject {
 	MPMusicPlayerController *iPod;
@@ -55,6 +59,7 @@ static FADaemonNotificationHandler *sharedInstance_ = nil;
 - (id)init {
 	if ((self = [super init])) {
 		iPod = [MPMusicPlayerController iPodMusicPlayer];
+		//[iPod beginGeneratingPlaybackNotifications];
 	}
 	
 	return self;
@@ -128,10 +133,56 @@ static FADaemonNotificationHandler *sharedInstance_ = nil;
 	NSInteger interval = (NSInteger)[iPod currentPlaybackTime];
 	return [NSDictionary dictionaryWithObject:[NSNumber numberWithInteger:interval] forKey:@"Interval"];
 }
+
+- (void)setRepeatMode:(NSString *)name userInfo:(NSDictionary *)dict {
+	MPMusicRepeatMode repeatMode = [[dict objectForKey:@"Mode"] integerValue];
+	[iPod setRepeatMode:repeatMode];
+}
+
+- (NSDictionary *)repeatMode {
+	MPMusicRepeatMode repeatMode = [iPod repeatMode];
+	NSLog(@"[foldalbumd] Repeat Mode: %i", repeatMode);
+	return [NSDictionary dictionaryWithObject:[NSNumber numberWithInteger:repeatMode] forKey:@"Mode"];
+}
+
+- (void)setShuffle:(NSString *)name userInfo:(NSDictionary *)dict {
+	MPMusicShuffleMode shuffleMode = [[dict objectForKey:@"Mode"] integerValue];
+	[iPod setShuffleMode:shuffleMode];
+}
+
+- (NSDictionary *)shuffleMode {
+	MPMusicShuffleMode shuffleMode = [iPod shuffleMode];
+	NSLog(@"[foldalbumd] Shuffle Mode: %i", shuffleMode);
+	return [NSDictionary dictionaryWithObject:[NSNumber numberWithInteger:shuffleMode] forKey:@"Mode"];
+}
+
+- (NSDictionary *)nowPlayingIndex {
+	NSLog(@"[foldalbumd] Summoned NPI");
+	NSUInteger index = [iPod indexOfNowPlayingItem];
+	NSLog(@"[foldalbumd] Got NPI");
+	return [NSDictionary dictionaryWithObject:[NSNumber numberWithUnsignedInteger:index] forKey:@"Index"];
+}
+
+- (NSDictionary *)trackCount {
+	NSLog(@"[foldalbumd] Summoned TC");
+	NSUInteger trackCount = [[[iPod queueAsQuery] items] count];
+	NSLog(@"[foldalbumd] Got TC");
+	return [NSDictionary dictionaryWithObject:[NSNumber numberWithUnsignedInteger:trackCount] forKey:@"Count"];
+}
+
+/*- (void)startWatch {
+	[iPod beginGeneratingPlaybackNotifications];
+	NSLog(@"STARTED WATCHIN LE NOTIFICATIONZ");
+}
+
+- (void)stopWatch {
+	[iPod endGeneratingPlaybackNotifications];
+	NSLog(@"STOPPED WATCHING LE NOTIFICATIONZ");
+}*/
 @end
 
 int main() {
-	NSLog(@"Welcome to foldalbumd!");
+	NSLog(@"[foldalbumd] Starting.");
 	NSAutoreleasePool *pool = [NSAutoreleasePool new];
 	
 	FADaemonNotificationHandler *hdl = [FADaemonNotificationHandler sharedInstance];
@@ -152,6 +203,14 @@ int main() {
 	[center registerForMessageName:@"SeekBeginning" target:hdl selector:@selector(seekBeginning)];
 	[center registerForMessageName:@"PlaybackTime" target:hdl selector:@selector(playbackTime)];
 	[center registerForMessageName:@"SetNowPlaying" target:hdl selector:@selector(setNowPlaying:userInfo:)];
+	[center registerForMessageName:@"SetRepeatMode" target:hdl selector:@selector(setRepeatMode:userInfo:)];
+	[center registerForMessageName:@"RepeatMode" target:hdl selector:@selector(repeatMode)];
+	[center registerForMessageName:@"SetShuffleMode" target:hdl selector:@selector(setShuffle:userInfo:)];
+	[center registerForMessageName:@"ShuffleMode" target:hdl selector:@selector(shuffleMode)];
+	[center registerForMessageName:@"NowPlayingIndex" target:hdl selector:@selector(nowPlayingIndex)];
+	[center registerForMessageName:@"TrackCount" target:hdl selector:@selector(trackCount)];
+	//[center registerForMessageName:@"StartWatch" target:hdl selector:@selector(startWatch)];
+	//[center registerForMessageName:@"StopWatch" target:hdl selector:@selector(stopWatch)];
 	
 	[center runServerOnCurrentThread];
 	// FIXME: Should we turn on the "KeepAlive" key instead of this? Will that work?

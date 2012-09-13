@@ -29,6 +29,8 @@
 // UI by Maximus. (@0_Maximus_0). He's also an awesome developer.
 
 #import "FAFolderCell.h"
+#import "FACalloutView.h"
+#import <AppSupport/CPDistributedMessagingCenter.h>
 
 @interface UIDevice (blah_fuck)
 - (BOOL)isWildcat;
@@ -73,11 +75,13 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
 	[lbl setBackgroundColor:[UIColor clearColor]];
 	[lbl setTextColor:[UIColor whiteColor]];
 	
-	CALayer *layer = [lbl layer];
+	// This made it lag so much.
+	// Really, it did.
+	/*CALayer *layer = [lbl layer];
 	[layer setShadowColor:[[UIColor blackColor] CGColor]];
 	[layer setShadowOpacity:.5f];
 	[layer setShadowOffset:CGSizeMake(0, 1)];
-	[layer setShouldRasterize:YES];
+	[layer setShouldRasterize:YES];*/
 	
 	return lbl;
 }
@@ -96,6 +100,9 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
 		_property = [MPMediaItemPropertyPlaybackDuration retain];
 		_placeholder = [UIImageResize([UIImage imageWithContentsOfFile:@"/System/Library/PrivateFrameworks/iPodUI.framework/CoverFlowPlaceHolder44.png"], CGSizeMake(32, 32)) retain];
 		//_state = MPMusicPlaybackStateStopped;
+		
+		/*UILongPressGestureRecognizer *pressGesture = [[[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(showProgressCallout)] autorelease];
+		[self addGestureRecognizer:pressGesture];*/
 		
 		_label = [FAFolderCell _makeLabelWithRect:CGRectMake(47, 8, 0, 20)];
 		[[self contentView] addSubview:_label];
@@ -145,7 +152,7 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
 - (void)layoutSubviews {
 	[super layoutSubviews];
     
-    UIImage *artwork = [self placeholderImage];
+	UIImage *artwork = [self placeholderImage];
 	[__imageView setImage:artwork];
     
     [_label setText:[_item valueForProperty:MPMediaItemPropertyTitle]];
@@ -224,6 +231,31 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
 	_item = [item retain];
 	[self setNeedsDisplay];
 }
+
+/*// The first part of this is basically a copy of what we do inside Tweak.xm
+// This tweak really needs less code duplicates.
+- (void)showProgressCallout {
+	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
+	NSData *nowPlayingData = [[center sendMessageAndReceiveReplyName:@"NowPlayingItem" userInfo:nil] objectForKey:@"Item"];
+	
+	if (nowPlayingData) {
+		MPMediaItem *nowPlayingItem = [NSKeyedUnarchiver unarchiveObjectWithData:nowPlayingData];
+		
+		NSNumber *nowPlayingPersistent = [nowPlayingItem valueForProperty:MPMediaItemPropertyPersistentID];
+		NSNumber *cellItemPersistent = [_item valueForProperty:MPMediaItemPropertyPersistentID];
+		
+		if ([nowPlayingPersistent compare:cellItemPersistent] == NSOrderedSame) {
+			UISlider *slider = [[[UISlider alloc] initWithFrame:CGRectMake(0, 0, 200, 20)] autorelease];
+			
+			FACalloutView *alert = [[[FACalloutView alloc] init] autorelease];
+			[alert placeQuitButtonInView:[self superview]];
+			
+			[alert setCenteredView:slider animated:YES];
+			[alert setAnchorPoint:CGPointMake(30, 30) boundaryRect:[[UIScreen mainScreen] applicationFrame] animate:YES];
+			[[self superview] addSubview:alert];
+		}
+	}
+}*/
 
 - (void)dealloc {
 	CGPathRelease(_path);

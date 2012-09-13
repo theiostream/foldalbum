@@ -2,9 +2,18 @@
 	Tweak.xm
 	
 	FoldMusic
-  	version 1.2.0, July 15th, 2012
+  	version 1.3.0, July 15th, 2012
 
-  Copyright (C) 2012 theiostream
+  Copyright (C) 2012 Daniel Ferreira
+  				     Colégio Visconde de Porto Seguro
+  					 Fundação Visconde can die in a hole.
+  					 Same thing goes for the Grêmio.
+  					 
+  Special thanks:
+  	David Murray
+  	The Doctor
+  	Dustin Howett
+  	Max Shavrick
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -35,7 +44,6 @@
 #import "FAPreferencesHandler.h"
 #import "FANotificationHandler.h"
 #import "FACalloutView.h"
-#import "UIImage+Resize.h"
 
 /*%%%%%%%%%%%
 %% Macros
@@ -59,10 +67,19 @@ static NSUInteger idx = 0;
 
 static char _mediaCollectionKey;
 static char _keyNameKey;
-static char _labelKey;
 
-static UIView *g_content = nil;
-static BOOL fromVolume = NO;
+static char _labelKey;
+static char _dataTableKey;
+static char _controlsViewKey;
+static char _musicButtonKey;
+static char _nowPlayingImageKey;
+static char _playButtonKey;
+static char _artistLabel;
+static char _songLabel;
+static char _albumLabel;
+static char _trackLabelKey;
+static char _repeatButton;
+static char _shuffleButton;
 
 static NSTimer *seekTimer = nil;
 static BOOL wasSeeking = NO;
@@ -77,6 +94,8 @@ static CGRect groupFrame;
 // Really though, Trevor Harmon's category makes the image blur.
 // Yay for StackOverflow answer!
 static UIImage *UIImageResize(UIImage *image, CGSize newSize) {
+	if (!image) return nil;
+	
 	UIGraphicsBeginImageContextWithOptions(newSize, NO, 0.0);
     [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
     UIImage *newImage = UIGraphicsGetImageFromCurrentImageContext();    
@@ -84,27 +103,33 @@ static UIImage *UIImageResize(UIImage *image, CGSize newSize) {
     return newImage;
 }
 
-// Yet another StackOverflow entry!
-// Credits go to Maximus for finding that one out! :P
-static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
-	UIGraphicsBeginImageContextWithOptions([image size], NO, 0.0);
-	CGContextRef context = UIGraphicsGetCurrentContext();
+static BOOL FANotStopped() {
+	//NSLog(@"returnin fanotstopped %@", [[%c(SBMediaController) sharedInstance] nowPlayingApplication]);
 	
-	CGRect rect = CGRectMake(0, 0, [image size].width, [image size].height+1);
-	CGPathRef clippingPath = [[UIBezierPath bezierPathWithRoundedRect:rect cornerRadius:cornerRadius] CGPath];
-	CGContextAddPath(context, clippingPath);
-	CGContextClip(context);
+	SBApplication *nowPlaying = [[%c(SBMediaController) sharedInstance] nowPlayingApplication];
+	if (nowPlaying != nil)
+		if ([[nowPlaying displayIdentifier] isEqualToString:@"com.apple.mobileipod"])
+			return YES;
 	
-	[image drawInRect:rect];
-	UIImage *newImage = UIGraphicsGetImageFromCurrentImageContext();
-	
-	UIGraphicsEndImageContext();
-	return newImage;
+	return NO;
 }
 
 /*%%%%%%%%%%%
 %% Subclasses
 %%%%%%%%%%%*/
+
+@interface FAProgressSlider : UISlider
+@end
+
+@implementation FAProgressSlider
+- (CGRect)thumbRectForBounds:(CGRect)bounds trackRect:(CGRect)rect value:(float)value {
+	CGRect r = [super thumbRectForBounds:bounds trackRect:rect value:value];
+	r.origin.y += 2;
+	r.size.width -= 3;
+	
+	return r;
+}
+@end
 
 %subclass FAFolder : SBFolder
 - (Class)folderViewClass {
@@ -143,8 +168,9 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 }
 
 - (void)dealloc {
+	%log;
 	%orig;
-	objc_removeAssociatedObjects(self);
+	objc_removeAssociatedObjects(self); // Please tell me this removes all associated object leaks.
 }
 %end
 
@@ -180,7 +206,7 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	// This is needed in case we get @"" from the text field.
 	[[self folder] setDisplayName:res];
 	
-	NSLog(@"[FoldMusic] res is %@", res);
+	//NSLog(@"[FoldMusic] res is %@", res);
 	[groupLabel setText:res];
 	//[groupLabel setFrame:groupFrame];
 	
@@ -204,12 +230,18 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	[groupLabel_ setHidden:YES];
 	// TODO: Find somewhere to release this unused label.
 	
-	UILabel *groupLabel = [[[UILabel alloc] initWithFrame:[groupLabel_ frame]] autorelease];
+	CGRect grFr = [groupLabel_ frame];
+	if ([collection isKindOfClass:[MPMediaPlaylist class]]) grFr.origin.y += grFr.size.height/2-8;
+	
+	SBFolderTitleLabel *groupLabel = [[[%c(SBFolderTitleLabel) alloc] initWithFrame:grFr] autorelease];
 	[groupLabel setFont:[groupLabel_ font]];
 	[groupLabel setBackgroundColor:[UIColor clearColor]];
 	[groupLabel setTextColor:[groupLabel_ textColor]];
 	[groupLabel setText:[groupLabel_ text]];
-	// TODO: Shadows!
+	[groupLabel setFont:[[groupLabel font] fontWithSize:20.f]];
+	[groupLabel setTextAlignment:UITextAlignmentLeft];
+	[groupLabel setAdjustsFontSizeToFitWidth:YES];
+	[groupLabel setMinimumFontSize:16.f];
 	
 	if (MSHookIvar<BOOL>(self, "_isEditing"))
 		[groupLabel setHidden:YES];
@@ -220,12 +252,8 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	
 	[groupLabel setFrame:groupRect];
 	groupFrame = [groupLabel frame];
-	[groupLabel setFont:[[groupLabel font] fontWithSize:20.f]];
-	[groupLabel setTextAlignment:UITextAlignmentLeft];
-	[groupLabel setAdjustsFontSizeToFitWidth:YES];
-	[groupLabel setMinimumFontSize:16.f];
 	
-	CGPoint subtitlePoint = CGPointMake(groupLabel.frame.origin.x, groupLabel.frame.origin.y+23);
+	CGPoint subtitlePoint = CGPointMake(groupLabel.frame.origin.x, groupLabel_.frame.origin.y+23);
 	CGSize subtitleSize = isiPad() ?
 		CGSizeMake(668, 16) :
 		CGSizeMake(230, 16);
@@ -245,7 +273,7 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	[textField setFrame:(CGRect){{groupLabel.bounds.origin.x+5, groupLabel.bounds.origin.y+3}, {groupLabel.bounds.size.width, textField.frame.size.height-2}}];
 	
 	if (![collection isKindOfClass:[MPMediaPlaylist class]]) {
-		UILabel *artistLabel = [[[UILabel alloc] initWithFrame:subtitleLabel] autorelease];
+		SBFolderTitleLabel *artistLabel = [[[%c(SBFolderTitleLabel) alloc] initWithFrame:subtitleLabel] autorelease];
 		[artistLabel setBackgroundColor:[UIColor clearColor]];
 		[artistLabel setFont:[[groupLabel font] fontWithSize:16.f]];
 		[artistLabel setAdjustsFontSizeToFitWidth:YES];
@@ -260,25 +288,23 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 		[self addSubview:artistLabel];
 	}
 	
-	else
-		subtitleLabel.origin.y -= 20;
-	
-	UIView *controllerContent = [[[UIView alloc] initWithFrame:CGRectMake((isiPad() ? 683 : 255), groupLabel.bounds.origin.y+5, 60, 25)] autorelease];
-	UIImage *musicImage = [[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/music.png"] resizedImage:CGSizeMake(25, 25) interpolationQuality:kCGInterpolationHigh];
-	UIImage *speakerImage = [[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/speaker.png"] resizedImage:CGSizeMake(22, 22) interpolationQuality:kCGInterpolationHigh];
+	UIView *controllerContent = [[[UIView alloc] initWithFrame:CGRectMake((isiPad() ? 683 : 255), (groupLabel.bounds.origin.y+5), 60, 55)] autorelease];
+	UIImage *musicImage = [UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/music.png"];
+	UIImage *arrowImage = UIImageResize([UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/arrow.png"], CGSizeMake(20, 16));
 	
 	UIButton *musicButton = [UIButton buttonWithType:UIButtonTypeCustom];
 	[musicButton setFrame:CGRectMake(0, 0, 25, 25)];
 	[musicButton setImage:musicImage forState:UIControlStateNormal];
 	[musicButton addTarget:self action:@selector(showControlsCallout) forControlEvents:UIControlEventTouchUpInside];
+	objc_setAssociatedObject(self, &_musicButtonKey, musicButton, OBJC_ASSOCIATION_RETAIN);
 	
-	UIButton *speakerButton = [UIButton buttonWithType:UIButtonTypeCustom];
-	[speakerButton setFrame:CGRectMake(35, 0, 25, 25)];
-	[speakerButton setImage:speakerImage forState:UIControlStateNormal];
-	[speakerButton addTarget:self action:@selector(showVolumeCallout:) forControlEvents:UIControlEventTouchUpInside];
+	UIButton *arrowButton = [UIButton buttonWithType:UIButtonTypeCustom];
+	[arrowButton setFrame:CGRectMake(35, 0, 25, 25)];
+	[arrowButton setImage:arrowImage forState:UIControlStateNormal];
+	[arrowButton addTarget:self action:@selector(gotoControls:) forControlEvents:UIControlEventTouchUpInside];
 	
 	[controllerContent addSubview:musicButton];
-	[controllerContent addSubview:speakerButton];
+	[controllerContent addSubview:arrowButton];
 	[self addSubview:controllerContent];
 	
 	CGRect tableFrame = CGRectMake((isiPad() ? 20 : -1), subtitleLabel.origin.y+25, (isiPad() ? UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 728 : 984 : 322), self.bounds.size.height-(subtitleLabel.origin.y+25));
@@ -292,8 +318,6 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	[[dataTable layer] setBorderWidth:.8f];
 	[[dataTable layer] setBorderColor:[UIColorFromHexWithAlpha(0xFFFFFF, 0.37) CGColor]];
 	
-	[self addSubview:dataTable];
-	
 	UISwipeGestureRecognizer *rig = [[[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(nextItem:)] autorelease];
 	[rig setDirection:UISwipeGestureRecognizerDirectionRight];
 	UISwipeGestureRecognizer *lef = [[[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(nextItem:)] autorelease];
@@ -301,6 +325,204 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	
 	[dataTable addGestureRecognizer:rig];
 	[dataTable addGestureRecognizer:lef];
+	
+	objc_setAssociatedObject(self, &_dataTableKey, dataTable, OBJC_ASSOCIATION_RETAIN);
+	[self addSubview:dataTable];
+	
+	//%%%%%%%%%
+	// Controls View
+	//%%%%%%%%%
+	
+	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
+	
+	NSData *nowPlayingData = [[center sendMessageAndReceiveReplyName:@"NowPlayingItem" userInfo:nil] objectForKey:@"Item"];
+	
+	NSString *placeholderSong = @"Not Playing";
+	UIImage *placeholderArtwork = UIImageResize([UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/noartplaceholder.png"], CGSizeMake(130, 130));
+	
+	MPMusicPlaybackState state;
+	UIImage *artworkImage = nil;
+	NSString *album=nil, *song=nil, *artist=nil;
+	NSInteger cur, tot;
+	MPMusicRepeatMode repeatMode;
+	MPMusicShuffleMode shuffleMode;
+	
+	if (nowPlayingData) {
+		state = [[[center sendMessageAndReceiveReplyName:@"PlaybackState" userInfo:nil] objectForKey:@"State"] integerValue];
+		MPMediaItem *nowPlayingItem = [NSKeyedUnarchiver unarchiveObjectWithData:nowPlayingData];
+		
+		MPMediaItemArtwork *artwork = [nowPlayingItem valueForProperty:MPMediaItemPropertyArtwork];
+		UIImage *artworkImg = UIImageResize([artwork imageWithSize:CGSizeMake(130, 130)], CGSizeMake(130, 130));
+		if (artworkImg) { artworkImage = artworkImg; }
+		else			{ artworkImage = placeholderArtwork; }
+		
+		song = [nowPlayingItem valueForProperty:MPMediaItemPropertyTitle];
+		if (!song) song = @"N/A"; // What the actual fuck.
+		album = [nowPlayingItem valueForProperty:MPMediaItemPropertyAlbumTitle];
+		artist = [nowPlayingItem valueForProperty:MPMediaItemPropertyArtist];
+		
+		cur = [[[center sendMessageAndReceiveReplyName:@"NowPlayingIndex" userInfo:nil] objectForKey:@"Index"] unsignedIntegerValue]+1;
+		tot = [[[center sendMessageAndReceiveReplyName:@"TrackCount" userInfo:nil] objectForKey:@"Count"] unsignedIntegerValue];
+		
+		repeatMode = [[[center sendMessageAndReceiveReplyName:@"RepeatMode" userInfo:nil] objectForKey:@"Mode"] integerValue];
+		shuffleMode = [[[center sendMessageAndReceiveReplyName:@"ShuffleMode" userInfo:nil] objectForKey:@"Mode"] integerValue];
+		//shuffleMode = MPMusicShuffleModeOff;
+	}
+	else {
+		artworkImage = placeholderArtwork;
+		state = MPMusicPlaybackStateStopped;
+		song = placeholderSong;
+		
+		cur = -1;
+		tot = -1;
+		
+		NSString *repMode = [[NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist"] objectForKey:@"MusicRepeatSetting"];
+		NSString *shuMode = [[NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist"] objectForKey:@"MusicShuffleSetting"];
+		repeatMode = (
+			[repMode isEqualToString:@"All"] ? MPMusicRepeatModeAll :
+			[repMode isEqualToString:@"One"] ? MPMusicRepeatModeOne :
+			MPMusicRepeatModeNone);
+		shuffleMode = (
+			[shuMode isEqualToString:@"Off"] ? MPMusicShuffleModeOff :
+			MPMusicShuffleModeSongs);
+	}
+	
+	UIView *controlsView = [[[UIView alloc] initWithFrame:(CGRect){{tableFrame.origin.x+tableFrame.size.width, tableFrame.origin.y}, tableFrame.size}] autorelease];
+	[[controlsView layer] setBorderWidth:.8f];
+	[[controlsView layer] setBorderColor:[UIColorFromHexWithAlpha(0xFFFFFF, 0.37) CGColor]];
+	
+	CGRect artworkFrame = CGRectMake(15, 15, 130, 130);
+	CGRect firstFrame = CGRectMake(150, 25, 320-(artworkFrame.origin.x+artworkFrame.size.width+8), 12);
+	
+	UIImageView *artworkView = [[[UIImageView alloc] initWithFrame:artworkFrame] autorelease];
+	[artworkView setImage:artworkImage];
+	objc_setAssociatedObject(self, &_nowPlayingImageKey, artworkView, OBJC_ASSOCIATION_RETAIN);
+	[controlsView addSubview:artworkView];
+	
+	// TODO: Frame correctly! :(
+	
+	UILabel *artistLabel = [[[UILabel alloc] initWithFrame:firstFrame] autorelease];
+	[artistLabel setText:artist];
+	[artistLabel setFont:[UIFont fontWithName:@".HelveticaNeueUI-Bold" size:12.f]];
+	[artistLabel setTextAlignment:UITextAlignmentCenter];
+	[artistLabel setTextColor:[UIColor whiteColor]];
+	[artistLabel setBackgroundColor:[UIColor clearColor]];
+	[artistLabel setShadowColor:[UIColor blackColor]];
+	[artistLabel setShadowOffset:CGSizeMake(0, 1)];
+	[artistLabel setHidden:(artist == nil)];
+	
+	objc_setAssociatedObject(self, &_artistLabel, artistLabel, OBJC_ASSOCIATION_RETAIN);
+	[controlsView addSubview:artistLabel];
+	
+	firstFrame.origin.y += 14;
+	
+	UILabel *songLabel = [[[UILabel alloc] initWithFrame:firstFrame] autorelease];
+	[songLabel setText:song];
+	[songLabel setFont:[UIFont fontWithName:@".HelveticaNeueUI-Bold" size:12.f]];
+	[songLabel setTextAlignment:UITextAlignmentCenter];
+	[songLabel setTextColor:[UIColor whiteColor]];
+	[songLabel setBackgroundColor:[UIColor clearColor]];
+	[songLabel setShadowColor:[UIColor blackColor]];
+	[songLabel setShadowOffset:CGSizeMake(0, 1)];
+	
+	objc_setAssociatedObject(self, &_songLabel, songLabel, OBJC_ASSOCIATION_RETAIN);
+	[controlsView addSubview:songLabel];
+	
+	firstFrame.origin.y += 14;
+	
+	UILabel *albumLabel = [[[UILabel alloc] initWithFrame:firstFrame] autorelease];
+	[albumLabel setText:album];
+	[albumLabel setFont:[UIFont fontWithName:@".HelveticaNeueUI-Bold" size:12.f]];
+	[albumLabel setTextAlignment:UITextAlignmentCenter];
+	[albumLabel setTextColor:[UIColor whiteColor]];
+	[albumLabel setBackgroundColor:[UIColor clearColor]];
+	[albumLabel setShadowColor:[UIColor blackColor]];
+	[albumLabel setShadowOffset:CGSizeMake(0, 1)];
+	[albumLabel setHidden:(album == nil)];
+	
+	objc_setAssociatedObject(self, &_albumLabel, albumLabel, OBJC_ASSOCIATION_RETAIN);
+	[controlsView addSubview:albumLabel];
+	
+	UIButton *backButton = [UIButton buttonWithType:UIButtonTypeCustom];
+	[backButton setFrame:CGRectMake(165, firstFrame.origin.y+27, 30, 27)];
+	[backButton setImage:[UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/prevtrack.png"] forState:UIControlStateNormal];
+	[backButton addTarget:self action:@selector(pressedBackwardButton) forControlEvents:UIControlEventTouchDown];
+	[backButton addTarget:self action:@selector(releasedBackwardButton) forControlEvents:UIControlEventTouchUpInside];
+	[backButton addTarget:self action:@selector(releasedBackwardButton) forControlEvents:UIControlEventTouchDragOutside];
+	[controlsView addSubview:backButton];
+	
+	UIImage *play = [UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/play.png"];
+	UIImage *pause = [UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/pause.png"];
+	UIButton *playButton = [UIButton buttonWithType:UIButtonTypeCustom];
+	[playButton setFrame:CGRectMake(220, firstFrame.origin.y+27, 30, 27)];
+	[playButton setImage:(state == MPMusicPlaybackStatePlaying ? pause : play) forState:UIControlStateNormal];
+	[playButton addTarget:self action:@selector(clickedPlayButton:) forControlEvents:UIControlEventTouchUpInside];
+	objc_setAssociatedObject(self, &_playButtonKey, playButton, OBJC_ASSOCIATION_RETAIN);
+	[controlsView addSubview:playButton];
+	
+	UIButton *nextButton = [UIButton buttonWithType:UIButtonTypeCustom];
+	[nextButton setFrame:CGRectMake(275, firstFrame.origin.y+27, 30, 27)];
+	[nextButton setImage:[UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/nexttrack.png"] forState:UIControlStateNormal];
+	[nextButton addTarget:self action:@selector(pressedForwardButton) forControlEvents:UIControlEventTouchDown];
+	[nextButton addTarget:self action:@selector(releasedForwardButton) forControlEvents:UIControlEventTouchUpInside];
+	[nextButton addTarget:self action:@selector(releasedForwardButton) forControlEvents:UIControlEventTouchDragOutside];
+	[controlsView addSubview:nextButton];
+	
+	MPVolumeView *volumeView = [[[MPVolumeView alloc] initWithFrame:CGRectMake(165, firstFrame.origin.y+65, 140, 20)] autorelease];
+	[controlsView addSubview:volumeView];
+	
+	CGMutablePathRef path = CGPathCreateMutable();
+	CGPathMoveToPoint(path, NULL, 0, 155);
+	CGPathAddLineToPoint(path, NULL, 320, 155);
+	CAShapeLayer *shape = [CAShapeLayer layer];
+	[shape setLineWidth:1.f];
+	[shape setLineCap:kCALineCapRound];
+	[shape setStrokeColor:[UIColorFromHexWithAlpha(0xFFFFFF, 0.37) CGColor]];
+	[shape setPath:path];
+	CGPathRelease(path);
+	[[controlsView layer] addSublayer:shape];
+	
+	NSString *trackText = [NSString stringWithFormat:@"Track %i of %i", cur, tot];
+	UILabel *trackLabel = [[[UILabel alloc] initWithFrame:CGRectMake(0, 185, 320, 12)] autorelease];
+	[trackLabel setText:trackText];
+	[trackLabel setFont:[UIFont fontWithName:@".HelveticaNeueUI-Bold" size:12.f]];
+	[trackLabel setTextAlignment:UITextAlignmentCenter];
+	[trackLabel setTextColor:[UIColor whiteColor]];
+	[trackLabel setBackgroundColor:[UIColor clearColor]];
+	[trackLabel setShadowColor:[UIColor blackColor]];
+	[trackLabel setShadowOffset:CGSizeMake(0, 1)];
+	[trackLabel setHidden:(cur == -1 || tot == -1)];
+	
+	objc_setAssociatedObject(self, &_trackLabelKey, trackLabel, OBJC_ASSOCIATION_RETAIN);
+	[controlsView addSubview:trackLabel];
+	
+	NSString *repeatImageName = (
+		repeatMode == MPMusicRepeatModeAll ? @"repeat_on.png" :
+		repeatMode == MPMusicRepeatModeOne ? @"repeat_on_1.png" :
+		@"repeat_off.png");
+	UIImage *repeatImage = [UIImage imageWithContentsOfFile:[NSString stringWithFormat:@"/System/Library/Frameworks/MediaPlayer.framework/%@", repeatImageName]];
+	UIButton *repeatButton = [UIButton buttonWithType:UIButtonTypeCustom];
+	[repeatButton setFrame:CGRectMake(115, 200, 25, 21)];
+	[repeatButton setImage:repeatImage forState:UIControlStateNormal];
+	[repeatButton addTarget:self action:@selector(pressedRepeatButton) forControlEvents:UIControlEventTouchUpInside];
+	objc_setAssociatedObject(self, &_repeatButton, repeatButton, OBJC_ASSOCIATION_RETAIN);
+	[controlsView addSubview:repeatButton];
+	
+	NSString *shuffleImageName = (
+		shuffleMode != MPMusicShuffleModeOff ? @"shuffle_on.png" :
+		@"shuffle_off.png");
+	UIImage *shuffleImage = [UIImage imageWithContentsOfFile:[NSString stringWithFormat:@"/System/Library/Frameworks/MediaPlayer.framework/%@", shuffleImageName]];
+	UIButton *shuffleButton = [UIButton buttonWithType:UIButtonTypeCustom];
+	[shuffleButton setFrame:CGRectMake(185, 200, 25, 21)];
+	[shuffleButton setImage:shuffleImage forState:UIControlStateNormal];
+	[shuffleButton addTarget:self action:@selector(pressedShuffleButton) forControlEvents:UIControlEventTouchUpInside];
+	objc_setAssociatedObject(self, &_shuffleButton, shuffleButton, OBJC_ASSOCIATION_RETAIN);
+	[controlsView addSubview:shuffleButton];
+	
+	objc_setAssociatedObject(self, &_controlsViewKey, controlsView, OBJC_ASSOCIATION_RETAIN);
+	[self addSubview:controlsView];
+	
+	[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(receivedTrackChanged) name:@"FAChangedPlayingInfo" object:nil];
 }
 
 %new(v@:)
@@ -316,17 +538,17 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	
 	UIView *content = [[[UIView alloc] initWithFrame:CGRectMake(0, 0, 130, 35)] autorelease];
 	
-	UIImage *play = [UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/play.png"];
-	UIImage *pause = [UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/pause.png"];
-	UIImage *backward = [UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/backward.png"];
-	UIImage *forward = [UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/forward.png"];
+	UIImage *play = [UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/play.png"];
+	UIImage *pause = [UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/pause.png"];
+	UIImage *backward = [UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/prevtrack.png"];
+	UIImage *forward = [UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/nexttrack.png"];
 	
 	UIButton *backwardButton = [UIButton buttonWithType:UIButtonTypeCustom];
 	[backwardButton setFrame:CGRectMake(10, 2.5, 30, 30)];
 	[backwardButton setImage:backward forState:UIControlStateNormal];
 	[backwardButton addTarget:self action:@selector(pressedBackwardButton) forControlEvents:UIControlEventTouchDown];
 	[backwardButton addTarget:self action:@selector(releasedBackwardButton) forControlEvents:UIControlEventTouchUpInside];
-	[backwardButton addTarget:self action:@selector(releasedBackwardButton) forControlEvents:UIControlEventTouchUpOutside];
+	[backwardButton addTarget:self action:@selector(releasedBackwardButton) forControlEvents:UIControlEventTouchDragOutside];
 	
 	UIButton *playPauseButton = [UIButton buttonWithType:UIButtonTypeCustom];
 	[playPauseButton setFrame:CGRectMake(50, 2.5, 30, 30)];
@@ -338,7 +560,7 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	[forwardButton setImage:forward forState:UIControlStateNormal];
 	[forwardButton addTarget:self action:@selector(pressedForwardButton) forControlEvents:UIControlEventTouchDown];
 	[forwardButton addTarget:self action:@selector(releasedForwardButton) forControlEvents:UIControlEventTouchUpInside];
-	[forwardButton addTarget:self action:@selector(releasedForwardButton) forControlEvents:UIControlEventTouchUpOutside];
+	[forwardButton addTarget:self action:@selector(releasedForwardButton) forControlEvents:UIControlEventTouchDragOutside];
 	
 	[content addSubview:backwardButton];
 	[content addSubview:playPauseButton];
@@ -352,38 +574,115 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	[self addSubview:alert];
 }
 
+%new(v@:)
+- (void)receivedTrackChanged {
+	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
+	
+	UIImage *artworkImage;
+	MPMusicPlaybackState state;
+	NSString *artist, *album, *song;
+	NSInteger cur, tot;
+	
+	if (FANotStopped()) {
+		NSData *itemData = [[center sendMessageAndReceiveReplyName:@"NowPlayingItem" userInfo:nil] objectForKey:@"Item"];
+		if (itemData) {
+			MPMediaItem *item = [NSKeyedUnarchiver unarchiveObjectWithData:itemData];
+			state = [[[center sendMessageAndReceiveReplyName:@"PlaybackState" userInfo:nil] objectForKey:@"State"] integerValue];
+			
+			MPMediaItemArtwork *artwork = [item valueForProperty:MPMediaItemPropertyArtwork];
+			UIImage *artworkImg = UIImageResize([artwork imageWithSize:CGSizeMake(130, 130)], CGSizeMake(130, 130));
+			if (artworkImg) artworkImage = artworkImg;
+			else artworkImage = UIImageResize([UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/noartplaceholder.png"], CGSizeMake(130, 130));
+			
+			artist = [item valueForProperty:MPMediaItemPropertyArtist];
+			album = [item valueForProperty:MPMediaItemPropertyAlbumTitle];
+			song = [item valueForProperty:MPMediaItemPropertyTitle];
+			if (!song) song = @"N/A";
+			
+			cur = [[[center sendMessageAndReceiveReplyName:@"NowPlayingIndex" userInfo:nil] objectForKey:@"Index"] unsignedIntegerValue]+1;
+			tot = [[[center sendMessageAndReceiveReplyName:@"TrackCount" userInfo:nil] objectForKey:@"Count"] unsignedIntegerValue];
+		}
+		
+		else goto no_data;
+	}
+	else {
+		no_data:
+		state = MPMusicPlaybackStateStopped;
+		
+		artworkImage = UIImageResize([UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/noartplaceholder.png"], CGSizeMake(130, 130));
+		
+		artist = nil;
+		album = nil;
+		song = @"Not Playing";
+		
+		cur = -1;
+		tot = -1;
+	}
+	
+	[objc_getAssociatedObject(self, &_nowPlayingImageKey) setImage:artworkImage];
+	
+	const char *playImage = state==MPMusicPlaybackStatePlaying || state==MPMusicPlaybackStateSeekingForward || state==MPMusicPlaybackStateSeekingBackward ? "pause.png" : "play.png";
+	[objc_getAssociatedObject(self, &_playButtonKey) setImage:[UIImage imageWithContentsOfFile:[NSString stringWithFormat:@"/System/Library/Frameworks/MediaPlayer.framework/%s", playImage]] forState:UIControlStateNormal];
+	
+	UILabel *artistLabel = objc_getAssociatedObject(self, &_artistLabel);
+	[artistLabel setHidden:(artist == nil)];
+	[artistLabel setText:artist];
+	
+	UILabel *albumLabel = objc_getAssociatedObject(self, &_albumLabel);
+	[albumLabel setHidden:(album == nil)];
+	[albumLabel setText:album];
+	
+	[objc_getAssociatedObject(self, &_songLabel) setText:song];
+	
+	UILabel *trackLabel = objc_getAssociatedObject(self, &_trackLabelKey);
+	[trackLabel setHidden:(cur == -1 || tot == -1)];
+	[trackLabel setText:[NSString stringWithFormat:@"Track %i of %i", cur, tot]];
+}
+
 %new(v@:@)
 - (void)clickedPlayButton:(UIButton *)button {
 	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
 	
 	MPMusicPlaybackState state;
-	NSData *nowPlayingData = [[center sendMessageAndReceiveReplyName:@"NowPlayingItem" userInfo:nil] objectForKey:@"Item"];
-	if (nowPlayingData)
+	if (FANotStopped()) {
 		state = [[[center sendMessageAndReceiveReplyName:@"PlaybackState" userInfo:nil] objectForKey:@"State"] integerValue];
+	}
 	else {
 		state = MPMusicPlaybackStateStopped;
 		NSData *queue = [NSKeyedArchiver archivedDataWithRootObject:[(FAFolder *)[self folder] mediaCollection]];
 		[center sendMessageName:@"SetQuery" userInfo:[NSDictionary dictionaryWithObject:queue forKey:@"Collection"]];
 	}
 	
+	UIButton *controlsButton = objc_getAssociatedObject(self, &_playButtonKey);
 	if (state == MPMusicPlaybackStatePlaying) {
-		[button setImage:[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/play.png"] forState:UIControlStateNormal];
+		if (![button isEqual:controlsButton]) [button setImage:[UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/play.png"] forState:UIControlStateNormal];
+		
 		[center sendMessageName:@"Pause" userInfo:nil];
 	}
-	
 	else {
-		[button setImage:[UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/pause.png"] forState:UIControlStateNormal];
+		if (![button isEqual:controlsButton]) [button setImage:[UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/pause.png"] forState:UIControlStateNormal];
+		
 		[center sendMessageName:@"Play" userInfo:nil];
 	}
+	
+	//[self receivedTrackChanged];
 }
 
 %new(v@:)
 - (void)pressedForwardButton {
+	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
+	if (![[center sendMessageAndReceiveReplyName:@"NowPlayingItem" userInfo:nil] objectForKey:@"Item"])
+		return;
+	
 	seekTimer = [NSTimer scheduledTimerWithTimeInterval:.5f target:self selector:@selector(_seekForward) userInfo:nil repeats:NO];
 }
 
 %new(v@:)
 - (void)pressedBackwardButton {
+	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
+	if (![[center sendMessageAndReceiveReplyName:@"NowPlayingItem" userInfo:nil] objectForKey:@"Item"])
+		return;
+	
 	seekTimer = [NSTimer scheduledTimerWithTimeInterval:.5f target:self selector:@selector(_seekBackward) userInfo:nil repeats:NO];
 }
 
@@ -406,6 +705,8 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 %new(v@:)
 - (void)releasedForwardButton {
 	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
+	if (!FANotStopped())
+		return;
 	
 	if (wasSeeking) {
 		[center sendMessageName:@"EndSeeking" userInfo:nil];
@@ -415,12 +716,17 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	}
 	
 	[seekTimer invalidate];
+	
 	[center sendMessageName:@"NextItem" userInfo:nil];
+	
+	//[self receivedTrackChanged];
 }
 
 %new(v@:)
 - (void)releasedBackwardButton {
 	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
+	if (!FANotStopped())
+		return;
 	
 	if (wasSeeking) {
 		[center sendMessageName:@"EndSeeking" userInfo:nil];
@@ -433,41 +739,123 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	
 	if ([[[center sendMessageAndReceiveReplyName:@"PlaybackTime" userInfo:nil] objectForKey:@"Interval"] integerValue] > 1)
 		[center sendMessageName:@"SeekBeginning" userInfo:nil];
-	else
+	else {
 		[center sendMessageName:@"PreviousItem" userInfo:nil];
-}
-
-%new(v@:@)
-- (void)showVolumeCallout:(UIButton *)btn {
-	FACalloutView *alert = [[[FACalloutView alloc] init] autorelease];
-	[alert placeQuitButtonInView:self];
-	[alert setFADelegate:self];
-	
-	fromVolume = YES;
-	g_content = [btn superview];
-	[UIView animateWithDuration:0.2f animations:^{
-		CGRect fr = [g_content frame];
-		fr.origin.x -= (isiPad() ? 13 : 20);
-		[g_content setFrame:fr];
-	}];
-	
-	MPVolumeView *slider = [[[MPVolumeView alloc] initWithFrame:CGRectMake(0, 0, 200.0, 20)] autorelease];
-	[alert setCenteredView:slider animated:YES];
-	[alert setAnchorPoint:CGPointMake((isiPad() ? 715.5 : 287.5), 25) boundaryRect:[[UIScreen mainScreen] applicationFrame] animate:YES];
-	[self addSubview:alert];
-}
-
-%new(v@:@)
-- (void)calloutViewDidExit:(FACalloutView *)callout {
-	if (fromVolume) {
-		[UIView animateWithDuration:0.2f animations:^{
-			CGRect fr = [g_content frame];
-			fr.origin.x += (isiPad() ? 13 : 20);
-			[g_content setFrame:fr];
-		}];
 	}
 	
-	fromVolume = NO;
+	//[self receivedTrackChanged];
+}
+
+%new(v@:)
+- (void)pressedRepeatButton {
+	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
+	const char *imageTitle;
+	
+	MPMusicRepeatMode repeatMode;
+	if (FANotStopped()) {
+		repeatMode = [[[center sendMessageAndReceiveReplyName:@"RepeatMode" userInfo:nil] objectForKey:@"Mode"] integerValue];
+		MPMusicRepeatMode newMode = (
+			repeatMode == MPMusicRepeatModeNone ? MPMusicRepeatModeAll :
+			repeatMode == MPMusicRepeatModeAll ? MPMusicRepeatModeOne :
+			MPMusicRepeatModeNone);
+		
+		imageTitle = (
+			newMode == MPMusicRepeatModeAll ? "repeat_on.png" :
+			newMode == MPMusicRepeatModeOne ? "repeat_on_1.png" :
+			"repeat_off.png");
+		
+		[center sendMessageName:@"SetRepeatMode" userInfo:[NSDictionary dictionaryWithObject:[NSNumber numberWithInteger:newMode] forKey:@"Mode"]];
+	}
+		
+	else {
+		NSDictionary *iPodDict = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist"];
+		
+		NSString *repMode = [iPodDict objectForKey:@"MusicRepeatSetting"];
+		NSString *newRepMode = (
+			[repMode isEqualToString:@"Off"] ? @"All" :
+			[repMode isEqualToString:@"All"] ? @"One" :
+			@"Off");
+		
+		imageTitle = (
+			[newRepMode isEqualToString:@"All"] ? "repeat_on.png" :
+			[newRepMode isEqualToString:@"One"] ? "repeat_on_1.png" :
+			"repeat_off.png");
+		
+		NSMutableDictionary *dict = [NSMutableDictionary dictionaryWithDictionary:iPodDict];
+		[dict setObject:newRepMode forKey:@"MusicRepeatSetting"];
+		[dict writeToFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist" atomically:YES];
+	}
+	
+	UIImage *repeatImage = [UIImage imageWithContentsOfFile:[NSString stringWithFormat:@"/System/Library/Frameworks/MediaPlayer.framework/%s", imageTitle]];
+	[objc_getAssociatedObject(self, &_repeatButton) setImage:repeatImage forState:UIControlStateNormal];
+}
+
+%new(v@:)
+- (void)pressedShuffleButton {
+	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
+	const char *imageTitle;
+	
+	MPMusicShuffleMode shuffleMode;
+	if (FANotStopped()) {
+		shuffleMode = [[[center sendMessageAndReceiveReplyName:@"ShuffleMode" userInfo:nil] objectForKey:@"Mode"] integerValue];
+		MPMusicRepeatMode newMode = (
+			shuffleMode == MPMusicShuffleModeOff ? MPMusicShuffleModeSongs :
+			MPMusicShuffleModeOff);
+		
+		imageTitle = (
+			newMode == MPMusicShuffleModeSongs ? "shuffle_on.png" :
+			"shuffle_off.png");
+		
+		[center sendMessageName:@"SetShuffleMode" userInfo:[NSDictionary dictionaryWithObject:[NSNumber numberWithInteger:newMode] forKey:@"Mode"]];
+	}
+		
+	else {
+		NSDictionary *iPodDict = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist"];
+		
+		NSString *shuMode = [iPodDict objectForKey:@"MusicShuffleSetting"];
+		NSString *newShuMode = (
+			[shuMode isEqualToString:@"Off"] ? @"Songs" :
+			@"Off");
+		
+		imageTitle = (
+			[newShuMode isEqualToString:@"Songs"] ? "shuffle_on.png" :
+			"shuffle_off.png");
+		
+		NSMutableDictionary *dict = [NSMutableDictionary dictionaryWithDictionary:iPodDict];
+		[dict setObject:newShuMode forKey:@"MusicShuffleSetting"];
+		[dict writeToFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist" atomically:YES];
+	}
+	
+	UIImage *shuffleImage = [UIImage imageWithContentsOfFile:[NSString stringWithFormat:@"/System/Library/Frameworks/MediaPlayer.framework/%s", imageTitle]];
+	[objc_getAssociatedObject(self, &_shuffleButton) setImage:shuffleImage forState:UIControlStateNormal];
+}
+
+%new(v@:@)
+- (void)gotoControls:(UIButton *)btn {
+	UITableView *table = objc_getAssociatedObject(self, &_dataTableKey);
+	CGRect tableFrame = [table frame];
+	
+	UIView *controlsView = objc_getAssociatedObject(self, &_controlsViewKey);
+	CGRect controlFrame = [controlsView frame];
+	
+	__block BOOL hideTable;
+	[UIView animateWithDuration:.2f animations:^{
+		if (tableFrame.origin.x >= (isiPad() ? 20 : -1)) {
+			[table setFrame:(CGRect){{-table.frame.size.width, table.frame.origin.y}, table.frame.size}];
+			[controlsView setFrame:tableFrame];
+			
+			hideTable = YES;
+		}
+		
+		else {
+			[controlsView setFrame:(CGRect){{controlsView.frame.origin.x+controlsView.frame.size.width, controlsView.frame.origin.y}, controlsView.frame.size}];
+			[table setFrame:controlFrame];
+			
+			hideTable = NO;
+		}
+	}];
+	
+	[btn setTransform:CGAffineTransformMakeRotation(hideTable ? M_PI : 0.f)];
 }
 
 // I do hope this doesn't leak.
@@ -488,8 +876,10 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	idx++;
 	idx = idx>=[_itemKeys count] ? 0 : idx;
 	
-	for (FAFolderCell *cell in [(UITableView *)[rec view] visibleCells])
-		[cell setDetailProperty:[_itemKeys objectAtIndex:idx] change:YES];
+	NSArray *visibleCells = [(UITableView *)[rec view] visibleCells];
+	NSUInteger count = [visibleCells count];
+	for (NSUInteger i=0; i<count; i++)
+		[[visibleCells objectAtIndex:i] setDetailProperty:[_itemKeys objectAtIndex:idx] change:YES];
 }
 
 %new(f@:@@)
@@ -531,6 +921,7 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
 	NSArray *items = [[(FAFolder *)[self folder] mediaCollection] items];
 	
+	MPMusicPlaybackState _state;
 	MPMediaItem *cellItem = [items objectAtIndex:[indexPath row]];
 	NSData *nowPlayingData = [[center sendMessageAndReceiveReplyName:@"NowPlayingItem" userInfo:nil] objectForKey:@"Item"];
 	
@@ -544,6 +935,7 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 		if ([nowPlayingPersistent compare:cellItemPersistent] == NSOrderedSame) {
 			if (state == MPMusicPlaybackStatePlaying) {
 				[center sendMessageName:@"Pause" userInfo:nil];
+				_state = MPMusicPlaybackStatePaused;
 				goto end;
 			}
 		
@@ -561,13 +953,19 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	
 	play:
 	[center sendMessageName:@"Play" userInfo:nil];
+	_state = MPMusicPlaybackStatePlaying;
 	
 	end:
 	[tableView deselectRowAtIndexPath:indexPath animated:YES];
+	//[self receivedTrackChanged];
 }
 
 - (void)dealloc {
+	%log;
+	
+	[[NSNotificationCenter defaultCenter] removeObserver:self];
 	objc_removeAssociatedObjects(self);
+	
 	%orig;
 }
 %end
@@ -631,15 +1029,31 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	
 	return %orig;
 }
+
+- (void)iconImageDidUpdate:(SBIcon *)icon {
+	%orig;
+	
+	UIImageView *imageView = MSHookIvar<UIImageView *>(self, "_iconImageView");
+	
+	CGRect fr = [imageView frame];
+	fr.origin.y -= 1;
+	fr.origin.x -= 1;
+	fr.size.height += 3;
+	fr.size.width += 3;
+	[imageView setFrame:fr];
+	
+	[[imageView layer] setCornerRadius:8.f];
+	[[imageView layer] setMasksToBounds:YES];
+}
 %end
 
 %hook SBFolderIcon
-// TODO: Improve this. I don't know how, just do.
 - (UIImage *)gridImageWithSkipping:(BOOL)skipping {
 	if ([[self folder] isKindOfClass:%c(FAFolder)]) {
+		UIImage *targetImage;
 		MPMediaItemCollection *collection = [(FAFolder *)[self folder] mediaCollection];
 		
-		CGFloat fr = isiPad() ? 55 : 45;
+		CGFloat fr = isiPad() ? 60 : 50;
 		CGSize iconSize = CGSizeMake(fr, fr);
 		
 		if (![collection isKindOfClass:[MPMediaPlaylist class]]) {
@@ -647,12 +1061,16 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 			MPMediaItemArtwork *artwork = [_item valueForProperty:MPMediaItemPropertyArtwork];
 			
 			UIImage *artworkImage = [artwork imageWithSize:iconSize];
-
-			if (artworkImage)
-				return UIImageRoundCorners(UIImageResize(artworkImage, iconSize), 8.f);
+			if (artworkImage) {
+				targetImage = UIImageResize(artworkImage, iconSize);
+				goto got_it;
+			}
 		}
-
-		return UIImageResize([UIImage imageWithContentsOfFile:@"/Library/Application Support/FoldAlbum/folder.png"], iconSize);
+		
+		targetImage = UIImageResize([UIImage imageWithContentsOfFile:@"/System/Library/PrivateFrameworks/iPodUI.framework/CoverFlowPlaceHolder44.png"], iconSize);
+		
+		got_it:
+		return targetImage;
 	}
 
 	return %orig;
@@ -701,7 +1119,9 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 %new(@@:)
 - (SBIconListModel *)firstAvailableModel {
 	NSArray *rootIconLists = [self rootIconLists];
-	for (SBIconListView *view in rootIconLists) {
+	NSUInteger count = [rootIconLists count];
+	for (NSUInteger i=0; i<count; i++) {
+		SBIconListView *view = [rootIconLists objectAtIndex:i];
 		SBIconListModel *model = [view model];
 		if (![model isFull])
 			return model;
@@ -718,7 +1138,9 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	FAPreferencesHandler *handler = [FAPreferencesHandler sharedInstance];
 	
 	NSArray *keys = [handler allKeys];
-	for (NSDictionary *d in keys) {
+	NSUInteger count = [keys count];
+	for (NSUInteger i=0; i<count; i++) {
+		NSDictionary *d = [keys objectAtIndex:i];
 		BOOL insert = YES;
 		
 		NSString *title = [d objectForKey:@"keyTitle"];
@@ -753,11 +1175,17 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 	FAPreferencesHandler *handler = [FAPreferencesHandler sharedInstance];
 	
 	NSArray *rootIconLists = [[%c(SBIconController) sharedInstance] rootIconLists];
-	for (SBIconListView *iconListView in rootIconLists) {
+	NSUInteger count = [rootIconLists count];
+	for (NSUInteger i=0; i<count; i++) {
+		SBIconListView *iconListView = [rootIconLists objectAtIndex:i];
 		SBIconListModel *model = [iconListView model];
-		NSArray *icons = [model icons];
 		
-		for (SBIcon *icon in icons) {
+		NSArray *icons = [model icons];
+		NSUInteger iconsCount = [icons count];
+		//NSLog(@"[!] Icons Count: %i", iconsCount);
+		for (NSUInteger j=0; j<iconsCount; j++) {
+			//NSLog(@"[!] Icon Index %i", j);
+			SBIcon *icon = [icons objectAtIndex:j];
 			if ([icon isKindOfClass:%c(SBFolderIcon)]) {
 				FAFolder *folder = (FAFolder *)[(SBFolderIcon *)icon folder];
 				
@@ -789,6 +1217,15 @@ static UIImage *UIImageRoundCorners(UIImage *image, CGFloat cornerRadius) {
 - (void)relayout {
 	%orig;
 	[[%c(SBIconController) sharedInstance] commitAlbumFolders];
+}
+%end
+
+// TODO: SBMediaIdkNotification
+%hook SBMediaController
+- (void)setNowPlayingInfo:(id)info {
+	NSLog(@"[FoldMusic] Set Now Playing Info");
+	[[NSNotificationCenter defaultCenter] postNotificationName:@"FAChangedPlayingInfo" object:nil];
+	%orig;
 }
 %end
 
