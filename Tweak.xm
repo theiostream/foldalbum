@@ -749,7 +749,10 @@ static BOOL FANotStopped() {
 %new(v@:)
 - (void)pressedRepeatButton {
 	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
+	NSDictionary *iPodDict = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist"];
+	
 	const char *imageTitle;
+	NSString *newRepMode;
 	
 	MPMusicRepeatMode repeatMode;
 	if (FANotStopped()) {
@@ -759,19 +762,24 @@ static BOOL FANotStopped() {
 			repeatMode == MPMusicRepeatModeAll ? MPMusicRepeatModeOne :
 			MPMusicRepeatModeNone);
 		
+		newRepMode = (
+			newMode == MPMusicRepeatModeAll ? @"All" :
+			newMode == MPMusicRepeatModeOne ? @"One" :
+			@"Off"); 
+		
+		[center sendMessageName:@"SetRepeatMode" userInfo:[NSDictionary dictionaryWithObject:[NSNumber numberWithInteger:newMode] forKey:@"Mode"]];
+		
 		imageTitle = (
 			newMode == MPMusicRepeatModeAll ? "repeat_on.png" :
 			newMode == MPMusicRepeatModeOne ? "repeat_on_1.png" :
 			"repeat_off.png");
-		
-		[center sendMessageName:@"SetRepeatMode" userInfo:[NSDictionary dictionaryWithObject:[NSNumber numberWithInteger:newMode] forKey:@"Mode"]];
 	}
 		
 	else {
 		NSDictionary *iPodDict = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist"];
 		
 		NSString *repMode = [iPodDict objectForKey:@"MusicRepeatSetting"];
-		NSString *newRepMode = (
+		newRepMode = (
 			[repMode isEqualToString:@"Off"] ? @"All" :
 			[repMode isEqualToString:@"All"] ? @"One" :
 			@"Off");
@@ -780,11 +788,11 @@ static BOOL FANotStopped() {
 			[newRepMode isEqualToString:@"All"] ? "repeat_on.png" :
 			[newRepMode isEqualToString:@"One"] ? "repeat_on_1.png" :
 			"repeat_off.png");
-		
-		NSMutableDictionary *dict = [NSMutableDictionary dictionaryWithDictionary:iPodDict];
-		[dict setObject:newRepMode forKey:@"MusicRepeatSetting"];
-		[dict writeToFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist" atomically:YES];
 	}
+	
+	NSMutableDictionary *dict = [NSMutableDictionary dictionaryWithDictionary:iPodDict];
+	[dict setObject:newRepMode forKey:@"MusicRepeatSetting"];
+	[dict writeToFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist" atomically:YES];
 	
 	UIImage *repeatImage = [UIImage imageWithContentsOfFile:[NSString stringWithFormat:@"/System/Library/Frameworks/MediaPlayer.framework/%s", imageTitle]];
 	[objc_getAssociatedObject(self, &_repeatButton) setImage:repeatImage forState:UIControlStateNormal];
@@ -793,7 +801,10 @@ static BOOL FANotStopped() {
 %new(v@:)
 - (void)pressedShuffleButton {
 	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
+	NSDictionary *iPodDict = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist"];
+	
 	const char *imageTitle;
+	NSString *newShuMode;
 	
 	MPMusicShuffleMode shuffleMode;
 	if (FANotStopped()) {
@@ -801,6 +812,10 @@ static BOOL FANotStopped() {
 		MPMusicRepeatMode newMode = (
 			shuffleMode == MPMusicShuffleModeOff ? MPMusicShuffleModeSongs :
 			MPMusicShuffleModeOff);
+		
+		newShuMode = (
+			newMode == MPMusicShuffleModeSongs ? @"Songs" :
+			@"Off");
 		
 		imageTitle = (
 			newMode == MPMusicShuffleModeSongs ? "shuffle_on.png" :
@@ -810,21 +825,19 @@ static BOOL FANotStopped() {
 	}
 		
 	else {
-		NSDictionary *iPodDict = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist"];
-		
 		NSString *shuMode = [iPodDict objectForKey:@"MusicShuffleSetting"];
-		NSString *newShuMode = (
+		newShuMode = (
 			[shuMode isEqualToString:@"Off"] ? @"Songs" :
 			@"Off");
 		
 		imageTitle = (
 			[newShuMode isEqualToString:@"Songs"] ? "shuffle_on.png" :
 			"shuffle_off.png");
-		
-		NSMutableDictionary *dict = [NSMutableDictionary dictionaryWithDictionary:iPodDict];
-		[dict setObject:newShuMode forKey:@"MusicShuffleSetting"];
-		[dict writeToFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist" atomically:YES];
 	}
+	
+	NSMutableDictionary *dict = [NSMutableDictionary dictionaryWithDictionary:iPodDict];
+	[dict setObject:newShuMode forKey:@"MusicShuffleSetting"];
+	[dict writeToFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist" atomically:YES];
 	
 	UIImage *shuffleImage = [UIImage imageWithContentsOfFile:[NSString stringWithFormat:@"/System/Library/Frameworks/MediaPlayer.framework/%s", imageTitle]];
 	[objc_getAssociatedObject(self, &_shuffleButton) setImage:shuffleImage forState:UIControlStateNormal];
