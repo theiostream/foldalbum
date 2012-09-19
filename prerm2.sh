@@ -1,10 +1,10 @@
 #!/bin/bash
 
 ##########
-##  postinst.sh
+##  prerm2.sh
 ##	
 ##	FoldMusic
-## 	version 1.2.0, July 15th, 2012
+## 	version 1.3.0, July 15th, 2012
 ##
 ##  Copyright (C) 2012 theiostream
 ##
@@ -28,10 +28,6 @@
 ##  matoe@matoe.co.cc
 ##########
 
-## Setting proper permissions to avoid launchd errors.
-chown root /Library/LaunchDaemons/am.theiostre.folderalbums.daemon.plist
-chmod 644 /Library/LaunchDaemons/am.theiostre.folderalbums.daemon.plist
-
-## Restarting foldalbumd
-launchctl unload /Library/LaunchDaemons/am.theiostre.folderalbums.daemon.plist
-launchctl load /Library/LaunchDaemons/am.theiostre.folderalbums.daemon.plist
+if [ -e /Library/LaunchDaemons/am.theiostre.folderalbums.daemon.plist ]; then
+	launchctl unload /Library/LaunchDaemons/am.theiostre.folderalbums.daemon.plist
+fi
