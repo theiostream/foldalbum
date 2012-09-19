@@ -46,14 +46,6 @@ static FAPreferencesHandler *sharedInstance_ = nil;
 
 - (id)init {
 	if ((self = [super init])) {
-		/*if ([[NSFileManager defaultManager] fileExistsAtPath:@"/Library/Application Support/FoldAlbum/_oldplist.plist"]) {
-			id cache = [[NSDictionary dictionaryWithContentsOfFile:@"/Library/Application Support/FoldAlbum/_oldplist.plist"] objectForKey:@"FAFolderCache"];
-			if (cache && [cache isKindOfClass:[NSArray class]]) {
-				_cache = [cache retain];
-				return self;
-			}
-		}*/
-		
 		id cache = [FALayoutDict() objectForKey:@"FAFolderCache"];
 		if (![cache isKindOfClass:[NSArray class]]) {
 			NSLog(@"[FoldMusic] Failure. Deleting your plist.");
