@@ -136,5 +136,16 @@
 @end
 
 @interface MPDetailSlider : UISlider
-@property(assign, nonatomic, getter=isActive) BOOL active;
++ (CGFloat)defaultHeight;
+- (void)setAllowsDetailScrubbing:(BOOL)allows;
+- (void)setDuration:(NSTimeInterval)duration;
+- (void)setDelegate:(id)delegate;
+@end
+
+@interface UIApplication (FASpringBoard)
+- (void)launchMusicPlayerSuspended;
+@end
+
+@interface MPMusicPlayerController (FAMusicPlayerControllerPrivate)
+- (MPMediaQuery *)queueAsQuery;
 @end

@@ -129,6 +129,11 @@ static FADaemonNotificationHandler *sharedInstance_ = nil;
 	[iPod skipToBeginning];
 }
 
+- (void)setPlaybackTime:(NSString *)name userInfo:(NSDictionary *)dict {
+	NSTimeInterval interval = [[dict objectForKey:@"Interval"] floatValue];
+	[iPod setCurrentPlaybackTime:interval];
+}
+
 - (NSNumber *)playbackTime {
 	NSInteger interval = (NSInteger)[iPod currentPlaybackTime];
 	return [NSDictionary dictionaryWithObject:[NSNumber numberWithInteger:interval] forKey:@"Interval"];
@@ -169,16 +174,6 @@ static FADaemonNotificationHandler *sharedInstance_ = nil;
 	NSLog(@"[foldalbumd] Got TC");
 	return [NSDictionary dictionaryWithObject:[NSNumber numberWithUnsignedInteger:trackCount] forKey:@"Count"];
 }
-
-/*- (void)startWatch {
-	[iPod beginGeneratingPlaybackNotifications];
-	NSLog(@"STARTED WATCHIN LE NOTIFICATIONZ");
-}
-
-- (void)stopWatch {
-	[iPod endGeneratingPlaybackNotifications];
-	NSLog(@"STOPPED WATCHING LE NOTIFICATIONZ");
-}*/
 @end
 
 int main() {
@@ -209,8 +204,7 @@ int main() {
 	[center registerForMessageName:@"ShuffleMode" target:hdl selector:@selector(shuffleMode)];
 	[center registerForMessageName:@"NowPlayingIndex" target:hdl selector:@selector(nowPlayingIndex)];
 	[center registerForMessageName:@"TrackCount" target:hdl selector:@selector(trackCount)];
-	//[center registerForMessageName:@"StartWatch" target:hdl selector:@selector(startWatch)];
-	//[center registerForMessageName:@"StopWatch" target:hdl selector:@selector(stopWatch)];
+	[center registerForMessageName:@"SetPlaybackTime" target:hdl selector:@selector(setPlaybackTime:userInfo:)];
 	
 	[center runServerOnCurrentThread];
 	// FIXME: Should we turn on the "KeepAlive" key instead of this? Will that work?

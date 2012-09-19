@@ -6,14 +6,12 @@
 
   Copyright (C) 2012 Daniel Ferreira
   				     Colégio Visconde de Porto Seguro
-  					 Fundação Visconde can die in a hole.
-  					 Same thing goes for the Grêmio.
   					 
   Special thanks:
-  	David Murray
-  	The Doctor
-  	Dustin Howett
-  	Max Shavrick
+  	David Murray "Cykey" (for being a friend and contributing to the project in tiny but awesome ways)
+  	The Doctor "The Doctor" (for saving the universe)
+  	Dustin Howett "DHowett" (for being a friend, creating theos, logos, nic, and giving awesome code tips)
+  	Max Shavrick "Maximus" (for being a friend, designing most of the UI, and giving awesome code tips)
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -56,6 +54,7 @@
 // From IconSupport; I am on a BIG hurry sorry world.
 #define isiPad() ([UIDevice instancesRespondToSelector:@selector(isWildcat)] && [[UIDevice currentDevice] isWildcat])
 
+// From CyDelete: DHowett is awesome.
 #define SBLocalizedString(key) \
 	[[NSBundle mainBundle] localizedStringForKey:key value:@"None" table:@"SpringBoard"]
 
@@ -63,11 +62,11 @@
 %% Declarations
 %%%%%%%%%%%*/
 
-static NSUInteger idx = 0;
-
+// Associated object keys for FAFolder
 static char _mediaCollectionKey;
 static char _keyNameKey;
 
+// Associated object keys for FAFolderView
 static char _labelKey;
 static char _dataTableKey;
 static char _controlsViewKey;
@@ -80,11 +79,18 @@ static char _albumLabel;
 static char _trackLabelKey;
 static char _repeatButton;
 static char _shuffleButton;
+static char _progTimer;
+static char _sliderKey;
+
+// Other globals
+static CGRect groupFrame;
 
 static NSTimer *seekTimer = nil;
 static BOOL wasSeeking = NO;
 
-static CGRect groupFrame;
+static NSUInteger idx = 0;
+
+static BOOL draggingSlider = NO;
 
 /*%%%%%%%%%%%
 %% Functions
@@ -103,7 +109,7 @@ static UIImage *UIImageResize(UIImage *image, CGSize newSize) {
     return newImage;
 }
 
-static BOOL FANotStopped() {
+/*static BOOL FANotStopped() {
 	//NSLog(@"returnin fanotstopped %@", [[%c(SBMediaController) sharedInstance] nowPlayingApplication]);
 	
 	SBApplication *nowPlaying = [[%c(SBMediaController) sharedInstance] nowPlayingApplication];
@@ -112,24 +118,30 @@ static BOOL FANotStopped() {
 			return YES;
 	
 	return NO;
+}*/
+
+static MPMusicRepeatMode FAGetRepeatMode() {
+	NSString *repMode = [[NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist"] objectForKey:@"MusicRepeatSetting"];
+	if (!repMode) return MPMusicRepeatModeNone;
+	
+	return (
+		[repMode isEqualToString:@"All"] ? MPMusicRepeatModeAll :
+		[repMode isEqualToString:@"One"] ? MPMusicRepeatModeOne :
+		MPMusicRepeatModeNone);
+}
+
+static MPMusicShuffleMode FAGetShuffleMode() {
+	NSString *shuMode = [[NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist"] objectForKey:@"MusicShuffleSetting"];
+	if (!shuMode) return MPMusicShuffleModeOff;
+	
+	return (
+		[shuMode isEqualToString:@"Off"] ? MPMusicShuffleModeOff :
+		MPMusicShuffleModeSongs);
 }
 
 /*%%%%%%%%%%%
 %% Subclasses
 %%%%%%%%%%%*/
-
-@interface FAProgressSlider : UISlider
-@end
-
-@implementation FAProgressSlider
-- (CGRect)thumbRectForBounds:(CGRect)bounds trackRect:(CGRect)rect value:(float)value {
-	CGRect r = [super thumbRectForBounds:bounds trackRect:rect value:value];
-	r.origin.y += 2;
-	r.size.width -= 3;
-	
-	return r;
-}
-@end
 
 %subclass FAFolder : SBFolder
 - (Class)folderViewClass {
@@ -186,14 +198,19 @@ static BOOL FANotStopped() {
 	return objc_getAssociatedObject(self, &_labelKey);
 }
 
-// Won't change anything, but can probably aboid future bugs
-// and adds preliminary support for other planned features.
-/*- (void)textFieldDidBeginEditing:(UITextField *)textField {
-	UILabel *groupLabel = [self groupLabel];
-	[groupLabel setHidden:YES];
+- (id)initWithFrame:(CGRect)frame {
+	%log;
 	
-	%orig;
-}*/
+	if ((self = %orig)) {
+		[[UIApplication sharedApplication] launchMusicPlayerSuspended];
+		
+		[[MPMusicPlayerController iPodMusicPlayer] beginGeneratingPlaybackNotifications];
+		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(receivedStateChanged) name:MPMusicPlayerControllerPlaybackStateDidChangeNotification object:nil];
+		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(receivedTrackChanged) name:MPMusicPlayerControllerNowPlayingItemDidChangeNotification object:nil];
+	}
+	
+	return self;
+}
 
 - (void)textFieldDidEndEditing:(UITextField *)textField {
 	UILabel *groupLabel = [self groupLabel];
@@ -333,9 +350,8 @@ static BOOL FANotStopped() {
 	// Controls View
 	//%%%%%%%%%
 	
-	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
-	
-	NSData *nowPlayingData = [[center sendMessageAndReceiveReplyName:@"NowPlayingItem" userInfo:nil] objectForKey:@"Item"];
+	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
+	MPMediaItem *nowPlayingItem = [music nowPlayingItem];
 	
 	NSString *placeholderSong = @"Not Playing";
 	UIImage *placeholderArtwork = UIImageResize([UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/noartplaceholder.png"], CGSizeMake(130, 130));
@@ -344,12 +360,12 @@ static BOOL FANotStopped() {
 	UIImage *artworkImage = nil;
 	NSString *album=nil, *song=nil, *artist=nil;
 	NSInteger cur, tot;
+	NSTimeInterval dur;
 	MPMusicRepeatMode repeatMode;
 	MPMusicShuffleMode shuffleMode;
 	
-	if (nowPlayingData) {
-		state = [[[center sendMessageAndReceiveReplyName:@"PlaybackState" userInfo:nil] objectForKey:@"State"] integerValue];
-		MPMediaItem *nowPlayingItem = [NSKeyedUnarchiver unarchiveObjectWithData:nowPlayingData];
+	if (nowPlayingItem) {
+		state = [music playbackState];
 		
 		MPMediaItemArtwork *artwork = [nowPlayingItem valueForProperty:MPMediaItemPropertyArtwork];
 		UIImage *artworkImg = UIImageResize([artwork imageWithSize:CGSizeMake(130, 130)], CGSizeMake(130, 130));
@@ -361,12 +377,12 @@ static BOOL FANotStopped() {
 		album = [nowPlayingItem valueForProperty:MPMediaItemPropertyAlbumTitle];
 		artist = [nowPlayingItem valueForProperty:MPMediaItemPropertyArtist];
 		
-		cur = [[[center sendMessageAndReceiveReplyName:@"NowPlayingIndex" userInfo:nil] objectForKey:@"Index"] unsignedIntegerValue]+1;
-		tot = [[[center sendMessageAndReceiveReplyName:@"TrackCount" userInfo:nil] objectForKey:@"Count"] unsignedIntegerValue];
+		cur = [music indexOfNowPlayingItem]+1;
+		tot = [[[music queueAsQuery] items] count];
+		dur = [[nowPlayingItem valueForProperty:MPMediaItemPropertyPlaybackDuration] floatValue];
 		
-		repeatMode = [[[center sendMessageAndReceiveReplyName:@"RepeatMode" userInfo:nil] objectForKey:@"Mode"] integerValue];
-		shuffleMode = [[[center sendMessageAndReceiveReplyName:@"ShuffleMode" userInfo:nil] objectForKey:@"Mode"] integerValue];
-		//shuffleMode = MPMusicShuffleModeOff;
+		repeatMode = [music repeatMode] == MPMusicRepeatModeDefault ? FAGetRepeatMode() : [music repeatMode];
+		shuffleMode = [music shuffleMode] == MPMusicShuffleModeDefault ? FAGetShuffleMode() : [music shuffleMode];
 	}
 	else {
 		artworkImage = placeholderArtwork;
@@ -375,16 +391,10 @@ static BOOL FANotStopped() {
 		
 		cur = -1;
 		tot = -1;
+		dur = 0;
 		
-		NSString *repMode = [[NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist"] objectForKey:@"MusicRepeatSetting"];
-		NSString *shuMode = [[NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist"] objectForKey:@"MusicShuffleSetting"];
-		repeatMode = (
-			[repMode isEqualToString:@"All"] ? MPMusicRepeatModeAll :
-			[repMode isEqualToString:@"One"] ? MPMusicRepeatModeOne :
-			MPMusicRepeatModeNone);
-		shuffleMode = (
-			[shuMode isEqualToString:@"Off"] ? MPMusicShuffleModeOff :
-			MPMusicShuffleModeSongs);
+		repeatMode = FAGetRepeatMode();
+		shuffleMode = FAGetShuffleMode();
 	}
 	
 	UIView *controlsView = [[[UIView alloc] initWithFrame:(CGRect){{tableFrame.origin.x+tableFrame.size.width, tableFrame.origin.y}, tableFrame.size}] autorelease];
@@ -482,8 +492,15 @@ static BOOL FANotStopped() {
 	CGPathRelease(path);
 	[[controlsView layer] addSublayer:shape];
 	
-	NSString *trackText = [NSString stringWithFormat:@"Track %i of %i", cur, tot];
-	UILabel *trackLabel = [[[UILabel alloc] initWithFrame:CGRectMake(0, 185, 320, 12)] autorelease];
+	UIView *extraView = [[[UIView alloc] initWithFrame:CGRectMake(0, 155, 320, self.frame.size.height-155)] autorelease];
+	
+	NSString *trackText;
+	if (cur > -1 && tot > -1)
+		trackText = [NSString stringWithFormat:@"Track %i of %i", cur, tot];
+	else
+		trackText = @"Track -- of --";
+	
+	UILabel *trackLabel = [[[UILabel alloc] initWithFrame:CGRectMake(0, 20, 320, 12)] autorelease];
 	[trackLabel setText:trackText];
 	[trackLabel setFont:[UIFont fontWithName:@".HelveticaNeueUI-Bold" size:12.f]];
 	[trackLabel setTextAlignment:UITextAlignmentCenter];
@@ -491,10 +508,17 @@ static BOOL FANotStopped() {
 	[trackLabel setBackgroundColor:[UIColor clearColor]];
 	[trackLabel setShadowColor:[UIColor blackColor]];
 	[trackLabel setShadowOffset:CGSizeMake(0, 1)];
-	[trackLabel setHidden:(cur == -1 || tot == -1)];
 	
 	objc_setAssociatedObject(self, &_trackLabelKey, trackLabel, OBJC_ASSOCIATION_RETAIN);
-	[controlsView addSubview:trackLabel];
+	[extraView addSubview:trackLabel];
+	
+	MPDetailSlider *slider = [[[MPDetailSlider alloc] initWithFrame:CGRectMake(0, 30, 320, [MPDetailSlider defaultHeight])] autorelease];
+	[slider setAllowsDetailScrubbing:YES];
+	[slider setDuration:dur];
+	[slider setDelegate:self];
+	
+	objc_setAssociatedObject(self, &_sliderKey, slider, OBJC_ASSOCIATION_RETAIN);
+	[extraView addSubview:slider];
 	
 	NSString *repeatImageName = (
 		repeatMode == MPMusicRepeatModeAll ? @"repeat_on.png" :
@@ -502,39 +526,33 @@ static BOOL FANotStopped() {
 		@"repeat_off.png");
 	UIImage *repeatImage = [UIImage imageWithContentsOfFile:[NSString stringWithFormat:@"/System/Library/Frameworks/MediaPlayer.framework/%@", repeatImageName]];
 	UIButton *repeatButton = [UIButton buttonWithType:UIButtonTypeCustom];
-	[repeatButton setFrame:CGRectMake(115, 200, 25, 21)];
+	[repeatButton setFrame:CGRectMake(15, 50, 25, 21)];
 	[repeatButton setImage:repeatImage forState:UIControlStateNormal];
 	[repeatButton addTarget:self action:@selector(pressedRepeatButton) forControlEvents:UIControlEventTouchUpInside];
 	objc_setAssociatedObject(self, &_repeatButton, repeatButton, OBJC_ASSOCIATION_RETAIN);
-	[controlsView addSubview:repeatButton];
+	[extraView addSubview:repeatButton];
 	
 	NSString *shuffleImageName = (
 		shuffleMode != MPMusicShuffleModeOff ? @"shuffle_on.png" :
 		@"shuffle_off.png");
 	UIImage *shuffleImage = [UIImage imageWithContentsOfFile:[NSString stringWithFormat:@"/System/Library/Frameworks/MediaPlayer.framework/%@", shuffleImageName]];
 	UIButton *shuffleButton = [UIButton buttonWithType:UIButtonTypeCustom];
-	[shuffleButton setFrame:CGRectMake(185, 200, 25, 21)];
+	[shuffleButton setFrame:CGRectMake(285, 50, 25, 21)];
 	[shuffleButton setImage:shuffleImage forState:UIControlStateNormal];
 	[shuffleButton addTarget:self action:@selector(pressedShuffleButton) forControlEvents:UIControlEventTouchUpInside];
 	objc_setAssociatedObject(self, &_shuffleButton, shuffleButton, OBJC_ASSOCIATION_RETAIN);
-	[controlsView addSubview:shuffleButton];
+	[extraView addSubview:shuffleButton];
+	
+	[controlsView addSubview:extraView];
 	
 	objc_setAssociatedObject(self, &_controlsViewKey, controlsView, OBJC_ASSOCIATION_RETAIN);
 	[self addSubview:controlsView];
-	
-	[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(receivedTrackChanged) name:@"FAChangedPlayingInfo" object:nil];
 }
 
 %new(v@:)
 - (void)showControlsCallout {
-	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
-	
-	MPMusicPlaybackState state;
-	NSData *nowPlayingData = [[center sendMessageAndReceiveReplyName:@"NowPlayingItem" userInfo:nil] objectForKey:@"Item"];
-	if (nowPlayingData)
-		state = [[[center sendMessageAndReceiveReplyName:@"PlaybackState" userInfo:nil] objectForKey:@"State"] integerValue];
-	else
-		state = MPMusicPlaybackStateStopped;
+	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
+	MPMusicPlaybackState state = [music playbackState];
 	
 	UIView *content = [[[UIView alloc] initWithFrame:CGRectMake(0, 0, 130, 35)] autorelease];
 	
@@ -576,39 +594,32 @@ static BOOL FANotStopped() {
 
 %new(v@:)
 - (void)receivedTrackChanged {
-	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
+	%log;
+	
+	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
+	MPMediaItem *item = [music nowPlayingItem];
 	
 	UIImage *artworkImage;
-	MPMusicPlaybackState state;
 	NSString *artist, *album, *song;
 	NSInteger cur, tot;
+	NSTimeInterval dur;
 	
-	if (FANotStopped()) {
-		NSData *itemData = [[center sendMessageAndReceiveReplyName:@"NowPlayingItem" userInfo:nil] objectForKey:@"Item"];
-		if (itemData) {
-			MPMediaItem *item = [NSKeyedUnarchiver unarchiveObjectWithData:itemData];
-			state = [[[center sendMessageAndReceiveReplyName:@"PlaybackState" userInfo:nil] objectForKey:@"State"] integerValue];
-			
-			MPMediaItemArtwork *artwork = [item valueForProperty:MPMediaItemPropertyArtwork];
-			UIImage *artworkImg = UIImageResize([artwork imageWithSize:CGSizeMake(130, 130)], CGSizeMake(130, 130));
-			if (artworkImg) artworkImage = artworkImg;
-			else artworkImage = UIImageResize([UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/noartplaceholder.png"], CGSizeMake(130, 130));
-			
-			artist = [item valueForProperty:MPMediaItemPropertyArtist];
-			album = [item valueForProperty:MPMediaItemPropertyAlbumTitle];
-			song = [item valueForProperty:MPMediaItemPropertyTitle];
-			if (!song) song = @"N/A";
-			
-			cur = [[[center sendMessageAndReceiveReplyName:@"NowPlayingIndex" userInfo:nil] objectForKey:@"Index"] unsignedIntegerValue]+1;
-			tot = [[[center sendMessageAndReceiveReplyName:@"TrackCount" userInfo:nil] objectForKey:@"Count"] unsignedIntegerValue];
-		}
+	if (item) {
+		MPMediaItemArtwork *artwork = [item valueForProperty:MPMediaItemPropertyArtwork];
+		UIImage *artworkImg = UIImageResize([artwork imageWithSize:CGSizeMake(130, 130)], CGSizeMake(130, 130));
+		if (artworkImg) artworkImage = artworkImg;
+		else artworkImage = UIImageResize([UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/noartplaceholder.png"], CGSizeMake(130, 130));
 		
-		else goto no_data;
+		artist = [item valueForProperty:MPMediaItemPropertyArtist];
+		album = [item valueForProperty:MPMediaItemPropertyAlbumTitle];
+		song = [item valueForProperty:MPMediaItemPropertyTitle];
+		if (!song) song = @"N/A";
+		
+		cur = [music indexOfNowPlayingItem]+1;
+		tot = [[[music queueAsQuery] items] count];
+		dur = [[item valueForProperty:MPMediaItemPropertyPlaybackDuration] floatValue];
 	}
 	else {
-		no_data:
-		state = MPMusicPlaybackStateStopped;
-		
 		artworkImage = UIImageResize([UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/noartplaceholder.png"], CGSizeMake(130, 130));
 		
 		artist = nil;
@@ -617,12 +628,10 @@ static BOOL FANotStopped() {
 		
 		cur = -1;
 		tot = -1;
+		dur = 0;
 	}
 	
 	[objc_getAssociatedObject(self, &_nowPlayingImageKey) setImage:artworkImage];
-	
-	const char *playImage = state==MPMusicPlaybackStatePlaying || state==MPMusicPlaybackStateSeekingForward || state==MPMusicPlaybackStateSeekingBackward ? "pause.png" : "play.png";
-	[objc_getAssociatedObject(self, &_playButtonKey) setImage:[UIImage imageWithContentsOfFile:[NSString stringWithFormat:@"/System/Library/Frameworks/MediaPlayer.framework/%s", playImage]] forState:UIControlStateNormal];
 	
 	UILabel *artistLabel = objc_getAssociatedObject(self, &_artistLabel);
 	[artistLabel setHidden:(artist == nil)];
@@ -634,35 +643,81 @@ static BOOL FANotStopped() {
 	
 	[objc_getAssociatedObject(self, &_songLabel) setText:song];
 	
+	NSString *trackText;
 	UILabel *trackLabel = objc_getAssociatedObject(self, &_trackLabelKey);
-	[trackLabel setHidden:(cur == -1 || tot == -1)];
-	[trackLabel setText:[NSString stringWithFormat:@"Track %i of %i", cur, tot]];
+	if (cur > -1 && tot > -1)
+		trackText = [NSString stringWithFormat:@"Track %i of %i", cur, tot];
+	else
+		trackText = @"Track -- of --";
+	[trackLabel setText:trackText];
+	
+	MPDetailSlider *slider = objc_getAssociatedObject(self, &_sliderKey);
+	[slider setDuration:dur];
+}
+
+%new(v@:)
+- (void)receivedStateChanged {
+	%log;
+	
+	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
+	MPMusicPlaybackState state = [music playbackState];
+	
+	const char *playImage = state==MPMusicPlaybackStatePlaying || state==MPMusicPlaybackStateSeekingForward || state==MPMusicPlaybackStateSeekingBackward ? "pause.png" : "play.png";
+	[objc_getAssociatedObject(self, &_playButtonKey) setImage:[UIImage imageWithContentsOfFile:[NSString stringWithFormat:@"/System/Library/Frameworks/MediaPlayer.framework/%s", playImage]] forState:UIControlStateNormal];
+}
+
+%new(v@:@f)
+- (void)detailSlider:(UISlider *)slider didChangeValue:(CGFloat)value {
+	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
+	[music setCurrentPlaybackTime:value];
+}
+
+%new(v@:@)
+- (void)detailSliderTrackingDidBegin:(UISlider *)slider {
+	draggingSlider = YES;
+}
+
+%new(v@:@)
+- (void)detailSliderTrackingDidEnd:(UISlider *)slider {
+	draggingSlider = NO;
+}
+
+%new(v@:@)
+- (void)detailSliderTrackingDidCancel:(UISlider *)slider {
+	draggingSlider = NO;
+}
+
+%new(v@:)
+- (void)changeValueByOne {
+	%log;
+	
+	if (!draggingSlider) {
+		UISlider *slider = objc_getAssociatedObject(self, &_sliderKey);
+		NSLog(@"woot %f %f", [slider value], [slider value]+1);
+		[slider setValue:[slider value]+1 animated:YES];
+	}
 }
 
 %new(v@:@)
 - (void)clickedPlayButton:(UIButton *)button {
-	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
+	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
+	MPMediaItem *item = [music nowPlayingItem];
+	MPMusicPlaybackState state = [music playbackState];
 	
-	MPMusicPlaybackState state;
-	if (FANotStopped()) {
-		state = [[[center sendMessageAndReceiveReplyName:@"PlaybackState" userInfo:nil] objectForKey:@"State"] integerValue];
-	}
-	else {
-		state = MPMusicPlaybackStateStopped;
-		NSData *queue = [NSKeyedArchiver archivedDataWithRootObject:[(FAFolder *)[self folder] mediaCollection]];
-		[center sendMessageName:@"SetQuery" userInfo:[NSDictionary dictionaryWithObject:queue forKey:@"Collection"]];
+	if (!item) {
+		MPMediaItemCollection *collection = [(FAFolder *)[self folder] mediaCollection];
+		[music setQueueWithItemCollection:collection];
 	}
 	
 	UIButton *controlsButton = objc_getAssociatedObject(self, &_playButtonKey);
 	if (state == MPMusicPlaybackStatePlaying) {
 		if (![button isEqual:controlsButton]) [button setImage:[UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/play.png"] forState:UIControlStateNormal];
-		
-		[center sendMessageName:@"Pause" userInfo:nil];
+		[music pause];
 	}
+	
 	else {
 		if (![button isEqual:controlsButton]) [button setImage:[UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/pause.png"] forState:UIControlStateNormal];
-		
-		[center sendMessageName:@"Play" userInfo:nil];
+		[music play];
 	}
 	
 	//[self receivedTrackChanged];
@@ -670,8 +725,9 @@ static BOOL FANotStopped() {
 
 %new(v@:)
 - (void)pressedForwardButton {
-	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
-	if (![[center sendMessageAndReceiveReplyName:@"NowPlayingItem" userInfo:nil] objectForKey:@"Item"])
+	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
+	MPMediaItem *item = [music nowPlayingItem];
+	if (!item)
 		return;
 	
 	seekTimer = [NSTimer scheduledTimerWithTimeInterval:.5f target:self selector:@selector(_seekForward) userInfo:nil repeats:NO];
@@ -679,8 +735,9 @@ static BOOL FANotStopped() {
 
 %new(v@:)
 - (void)pressedBackwardButton {
-	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
-	if (![[center sendMessageAndReceiveReplyName:@"NowPlayingItem" userInfo:nil] objectForKey:@"Item"])
+	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
+	MPMediaItem *item = [music nowPlayingItem];
+	if (!item)
 		return;
 	
 	seekTimer = [NSTimer scheduledTimerWithTimeInterval:.5f target:self selector:@selector(_seekBackward) userInfo:nil repeats:NO];
@@ -688,48 +745,49 @@ static BOOL FANotStopped() {
 
 %new(v@:)
 - (void)_seekForward {
-	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
-	[center sendMessageName:@"SeekForward" userInfo:nil];
+	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
+	[music beginSeekingForward];
 	
 	wasSeeking = YES;
 }
 
 %new(v@:)
 - (void)_seekBackward {
-	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
-	[center sendMessageName:@"SeekBackward" userInfo:nil];
+	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
+	[music beginSeekingBackward];
 	
 	wasSeeking = YES;
 }
 
 %new(v@:)
 - (void)releasedForwardButton {
-	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
-	if (!FANotStopped())
-		return;
+	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
+	MPMediaItem *item = [music nowPlayingItem];
+	
+	if (!item) return;
 	
 	if (wasSeeking) {
-		[center sendMessageName:@"EndSeeking" userInfo:nil];
+		[music endSeeking];
 		wasSeeking = NO;
 		
 		return;
 	}
 	
 	[seekTimer invalidate];
-	
-	[center sendMessageName:@"NextItem" userInfo:nil];
+	[music skipToNextItem];
 	
 	//[self receivedTrackChanged];
 }
 
 %new(v@:)
 - (void)releasedBackwardButton {
-	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
-	if (!FANotStopped())
-		return;
+	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
+	MPMediaItem *item = [music nowPlayingItem];
+	
+	if (!item) return;
 	
 	if (wasSeeking) {
-		[center sendMessageName:@"EndSeeking" userInfo:nil];
+		[music endSeeking];
 		wasSeeking = NO;
 		
 		return;
@@ -737,62 +795,30 @@ static BOOL FANotStopped() {
 	
 	[seekTimer invalidate];
 	
-	if ([[[center sendMessageAndReceiveReplyName:@"PlaybackTime" userInfo:nil] objectForKey:@"Interval"] integerValue] > 1)
-		[center sendMessageName:@"SeekBeginning" userInfo:nil];
-	else {
-		[center sendMessageName:@"PreviousItem" userInfo:nil];
-	}
+	if ([music currentPlaybackTime] > 2)
+		[music skipToBeginning];
+	else
+		[music skipToPreviousItem];
 	
 	//[self receivedTrackChanged];
 }
 
 %new(v@:)
 - (void)pressedRepeatButton {
-	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
-	NSDictionary *iPodDict = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist"];
+	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
+		
+	MPMusicRepeatMode repeatMode = [music repeatMode] == MPMusicRepeatModeDefault ? FAGetRepeatMode() : [music repeatMode];
 	
-	const char *imageTitle;
-	NSString *newRepMode;
+	MPMusicRepeatMode newMode = (
+		repeatMode == MPMusicRepeatModeNone ? MPMusicRepeatModeAll :
+		repeatMode == MPMusicRepeatModeAll ? MPMusicRepeatModeOne :
+		MPMusicRepeatModeNone);
+	[music setRepeatMode:newMode];
 	
-	MPMusicRepeatMode repeatMode;
-	if (FANotStopped()) {
-		repeatMode = [[[center sendMessageAndReceiveReplyName:@"RepeatMode" userInfo:nil] objectForKey:@"Mode"] integerValue];
-		MPMusicRepeatMode newMode = (
-			repeatMode == MPMusicRepeatModeNone ? MPMusicRepeatModeAll :
-			repeatMode == MPMusicRepeatModeAll ? MPMusicRepeatModeOne :
-			MPMusicRepeatModeNone);
-		
-		newRepMode = (
-			newMode == MPMusicRepeatModeAll ? @"All" :
-			newMode == MPMusicRepeatModeOne ? @"One" :
-			@"Off"); 
-		
-		[center sendMessageName:@"SetRepeatMode" userInfo:[NSDictionary dictionaryWithObject:[NSNumber numberWithInteger:newMode] forKey:@"Mode"]];
-		
-		imageTitle = (
-			newMode == MPMusicRepeatModeAll ? "repeat_on.png" :
-			newMode == MPMusicRepeatModeOne ? "repeat_on_1.png" :
-			"repeat_off.png");
-	}
-		
-	else {
-		NSDictionary *iPodDict = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist"];
-		
-		NSString *repMode = [iPodDict objectForKey:@"MusicRepeatSetting"];
-		newRepMode = (
-			[repMode isEqualToString:@"Off"] ? @"All" :
-			[repMode isEqualToString:@"All"] ? @"One" :
-			@"Off");
-		
-		imageTitle = (
-			[newRepMode isEqualToString:@"All"] ? "repeat_on.png" :
-			[newRepMode isEqualToString:@"One"] ? "repeat_on_1.png" :
-			"repeat_off.png");
-	}
-	
-	NSMutableDictionary *dict = [NSMutableDictionary dictionaryWithDictionary:iPodDict];
-	[dict setObject:newRepMode forKey:@"MusicRepeatSetting"];
-	[dict writeToFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist" atomically:YES];
+	const char *imageTitle = (
+		newMode == MPMusicRepeatModeAll ? "repeat_on.png" :
+		newMode == MPMusicRepeatModeOne ? "repeat_on_1.png" :
+		"repeat_off.png");
 	
 	UIImage *repeatImage = [UIImage imageWithContentsOfFile:[NSString stringWithFormat:@"/System/Library/Frameworks/MediaPlayer.framework/%s", imageTitle]];
 	[objc_getAssociatedObject(self, &_repeatButton) setImage:repeatImage forState:UIControlStateNormal];
@@ -800,47 +826,42 @@ static BOOL FANotStopped() {
 
 %new(v@:)
 - (void)pressedShuffleButton {
-	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
-	NSDictionary *iPodDict = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist"];
+	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
+	MPMediaItem *item = [music nowPlayingItem];
 	
-	const char *imageTitle;
-	NSString *newShuMode;
+	MPMusicShuffleMode shuffleMode = [music shuffleMode] == MPMusicShuffleModeDefault ? FAGetShuffleMode() : [music shuffleMode];
 	
-	MPMusicShuffleMode shuffleMode;
-	if (FANotStopped()) {
-		shuffleMode = [[[center sendMessageAndReceiveReplyName:@"ShuffleMode" userInfo:nil] objectForKey:@"Mode"] integerValue];
-		MPMusicRepeatMode newMode = (
-			shuffleMode == MPMusicShuffleModeOff ? MPMusicShuffleModeSongs :
-			MPMusicShuffleModeOff);
-		
-		newShuMode = (
-			newMode == MPMusicShuffleModeSongs ? @"Songs" :
-			@"Off");
-		
-		imageTitle = (
-			newMode == MPMusicShuffleModeSongs ? "shuffle_on.png" :
-			"shuffle_off.png");
-		
-		[center sendMessageName:@"SetShuffleMode" userInfo:[NSDictionary dictionaryWithObject:[NSNumber numberWithInteger:newMode] forKey:@"Mode"]];
-	}
-		
-	else {
-		NSString *shuMode = [iPodDict objectForKey:@"MusicShuffleSetting"];
-		newShuMode = (
-			[shuMode isEqualToString:@"Off"] ? @"Songs" :
-			@"Off");
-		
-		imageTitle = (
-			[newShuMode isEqualToString:@"Songs"] ? "shuffle_on.png" :
-			"shuffle_off.png");
-	}
+	MPMusicShuffleMode newMode = (
+		shuffleMode == MPMusicShuffleModeOff ? MPMusicShuffleModeSongs :
+		MPMusicShuffleModeOff);
+	[music setShuffleMode:newMode];
 	
-	NSMutableDictionary *dict = [NSMutableDictionary dictionaryWithDictionary:iPodDict];
-	[dict setObject:newShuMode forKey:@"MusicShuffleSetting"];
-	[dict writeToFile:@"/var/mobile/Library/Preferences/com.apple.mobileipod.plist" atomically:YES];
+	const char *imageTitle = (
+		newMode == MPMusicShuffleModeSongs ? "shuffle_on.png" :
+		"shuffle_off.png");
 	
 	UIImage *shuffleImage = [UIImage imageWithContentsOfFile:[NSString stringWithFormat:@"/System/Library/Frameworks/MediaPlayer.framework/%s", imageTitle]];
 	[objc_getAssociatedObject(self, &_shuffleButton) setImage:shuffleImage forState:UIControlStateNormal];
+	
+	NSInteger cur, tot;
+	if (item) {
+		cur = [music indexOfNowPlayingItem]+1;
+		tot = [[[music queueAsQuery] items] count];
+	}
+	else {
+		cur = -1;
+		tot = -1;
+	}
+	
+	NSLog(@"cur %i tot %i", cur, tot);
+	NSString *trackText;
+	UILabel *trackLabel = objc_getAssociatedObject(self, &_trackLabelKey);
+	if (cur > -1 && tot > -1)
+		trackText = [NSString stringWithFormat:@"Track %i of %i", cur, tot];
+	else
+		trackText = @"Track -- of --";
+	NSLog(@"YO TEXT IZ %@ AND LE LBL %@", trackText, trackLabel);
+	[trackLabel setText:trackText];
 }
 
 %new(v@:@)
@@ -929,26 +950,23 @@ static BOOL FANotStopped() {
 
 %new(v@:@@)
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-	NSData *queue, *itemData;
+	MPMediaItemCollection *collection = [(FAFolder *)[self folder] mediaCollection];
 	
-	CPDistributedMessagingCenter *center = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.player"];
-	NSArray *items = [[(FAFolder *)[self folder] mediaCollection] items];
+	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
+	MPMediaItem *nowPlayingItem = [music nowPlayingItem];
 	
-	MPMusicPlaybackState _state;
+	NSArray *items = [collection items];
 	MPMediaItem *cellItem = [items objectAtIndex:[indexPath row]];
-	NSData *nowPlayingData = [[center sendMessageAndReceiveReplyName:@"NowPlayingItem" userInfo:nil] objectForKey:@"Item"];
 	
-	if (nowPlayingData) {
-		MPMediaItem *nowPlayingItem = [NSKeyedUnarchiver unarchiveObjectWithData:nowPlayingData];
-		MPMusicPlaybackState state = [[[center sendMessageAndReceiveReplyName:@"PlaybackState" userInfo:nil] objectForKey:@"State"] integerValue];
+	if (nowPlayingItem) {
+		MPMusicPlaybackState state = [music playbackState];
 	
 		NSNumber *nowPlayingPersistent = [nowPlayingItem valueForProperty:MPMediaItemPropertyPersistentID];
 		NSNumber *cellItemPersistent = [cellItem valueForProperty:MPMediaItemPropertyPersistentID];
 	
 		if ([nowPlayingPersistent compare:cellItemPersistent] == NSOrderedSame) {
 			if (state == MPMusicPlaybackStatePlaying) {
-				[center sendMessageName:@"Pause" userInfo:nil];
-				_state = MPMusicPlaybackStatePaused;
+				[music pause];
 				goto end;
 			}
 		
@@ -958,15 +976,13 @@ static BOOL FANotStopped() {
 		}
 	}
 	
-	queue = [NSKeyedArchiver archivedDataWithRootObject:[(FAFolder *)[self folder] mediaCollection]];
-	[center sendMessageName:@"SetQuery" userInfo:[NSDictionary dictionaryWithObject:queue forKey:@"Collection"]];
+	collection = [(FAFolder *)[self folder] mediaCollection];
+	[music setQueueWithItemCollection:collection];
 	
-	itemData = [NSKeyedArchiver archivedDataWithRootObject:cellItem];
-	[center sendMessageName:@"SetNowPlaying" userInfo:[NSDictionary dictionaryWithObject:itemData forKey:@"Item"]];
+	[music setNowPlayingItem:cellItem];
 	
 	play:
-	[center sendMessageName:@"Play" userInfo:nil];
-	_state = MPMusicPlaybackStatePlaying;
+	[music play];
 	
 	end:
 	[tableView deselectRowAtIndexPath:indexPath animated:YES];
@@ -977,6 +993,8 @@ static BOOL FANotStopped() {
 	%log;
 	
 	[[NSNotificationCenter defaultCenter] removeObserver:self];
+	[[MPMusicPlayerController iPodMusicPlayer] endGeneratingPlaybackNotifications];
+	
 	objc_removeAssociatedObjects(self);
 	
 	%orig;
@@ -1233,14 +1251,14 @@ static BOOL FANotStopped() {
 }
 %end
 
-// TODO: SBMediaIdkNotification
+/*// TODO: SBMediaIdkNotification
 %hook SBMediaController
 - (void)setNowPlayingInfo:(id)info {
 	NSLog(@"[FoldMusic] Set Now Playing Info");
 	[[NSNotificationCenter defaultCenter] postNotificationName:@"FAChangedPlayingInfo" object:nil];
 	%orig;
 }
-%end
+%end*/
 
 %ctor {
 	// FIXME: Do we need IconSupport?
@@ -1250,6 +1268,7 @@ static BOOL FANotStopped() {
 	// Init hooks
 	%init;
 	
+	// TODO: FANotificationHandler should setup notification crap by itself, not through Tweak.xm
 	// Setup messaging center
 	FANotificationHandler *handler = [FANotificationHandler sharedInstance];
 	

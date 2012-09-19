@@ -29,7 +29,8 @@
 
 include theos/makefiles/common.mk
 
-SUBPROJECTS = FAPreferences foldalbumd
+# Yup. No longer foldalbumd.
+SUBPROJECTS = FAPreferences
 
 TWEAK_NAME = FolderAlbums
 FolderAlbums_FILES = Tweak.xm FAPreferencesHandler.m FANotificationHandler.mm FAFolderCell.m FACalloutView.m
@@ -41,9 +42,9 @@ include $(THEOS_MAKE_PATH)/aggregate.mk
 
 internal-stage::
 	$(ECHO_NOTHING)mkdir -p $(THEOS_STAGING_DIR)/DEBIAN$(ECHO_END)
-#	$(ECHO_NOTHING)cp preinst.sh $(THEOS_STAGING_DIR)/DEBIAN/preinst$(ECHO_END)
-	$(ECHO_NOTHING)cp postinst.sh $(THEOS_STAGING_DIR)/DEBIAN/postinst$(ECHO_END)
-	$(ECHO_NOTHING)cp prerm.sh $(THEOS_STAGING_DIR)/DEBIAN/prerm$(ECHO_END)
+	$(ECHO_NOTHING)cp preinst2.sh $(THEOS_STAGING_DIR)/DEBIAN/preinst$(ECHO_END)
+#	$(ECHO_NOTHING)cp postinst.sh $(THEOS_STAGING_DIR)/DEBIAN/postinst$(ECHO_END)
+	$(ECHO_NOTHING)cp prerm2.sh $(THEOS_STAGING_DIR)/DEBIAN/prerm$(ECHO_END)
 	
 	$(ECHO_NOTHING)mkdir -p $(THEOS_STAGING_DIR)/Library/Application\ Support/$(ECHO_END)
 	$(ECHO_NOTHING)cp -r Resources/ $(THEOS_STAGING_DIR)/Library/Application\ Support/FoldAlbum$(ECHO_END)

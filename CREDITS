@@ -1,30 +1,33 @@
-FoldMusic v1.2.0
-(July 15th, 2012)
+FoldMusic v1.3.0
+(September 17th, 2012)
 
-This project could not be here without these awesome people:
--- Christina Brooks (the developer, not the porn star)
+This project could not be here without these awesome people who helped directly with the project:
+-- Andrew Richardson
 -- David Murray
+-- Lance Fetters
+-- Max Shavrick
+
+And without these people who helped myself through the development:
+-- Christina Brooks
 -- Dustin Howett
 -- Guillermo Morán
--- Max Shavrick
+-- Joshua M. Tucker (THE AMERICAN ONE)
 -- Nolan Welser
 -- Optimo
 
-And without the projects:
+And our awesome bug reporters:
+-- Nguyen Minh Duy
+(INSERT OTHERS HERE)
+
+Of course, these projects were great for some source code browsing:
 -- btedev's AudioMeetupDemos (MPMusicPlayerDemo)
 -- DHowett's CyDelete
 -- chpwn+ashikase+Sakurina's IconSupport
 -- BigBoss's libhide
--- theiostream's LumiWidgets
+-- LuminiOSity's LumiWidgets
 -- rpetrich's RunningIndicator
 -- theiostream's SearchCommands
 -- qwertyoruiop+Maximus's UISettings
 
 And it contains:
 -- Part of the MPMediaItemCollection category by Jamin Guy (from JGMediaPickerController)
--- Part of the UIImage resizing category by Trevor Harmon
-
-Also, I needed to browse those to solve stupid problems:
--- StackOverflow
--- GitHub
--- Apple Mailing Lists
