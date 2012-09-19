@@ -42,7 +42,6 @@ include $(THEOS_MAKE_PATH)/aggregate.mk
 
 internal-stage::
 	$(ECHO_NOTHING)mkdir -p $(THEOS_STAGING_DIR)/DEBIAN$(ECHO_END)
-	$(ECHO_NOTHING)cp preinst2.sh $(THEOS_STAGING_DIR)/DEBIAN/preinst$(ECHO_END)
 	$(ECHO_NOTHING)cp prerm2.sh $(THEOS_STAGING_DIR)/DEBIAN/prerm$(ECHO_END)
 	
 	$(ECHO_NOTHING)mkdir -p $(THEOS_STAGING_DIR)/Library/Application\ Support/$(ECHO_END)
