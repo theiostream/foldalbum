@@ -79,26 +79,28 @@ static char _albumLabel;
 static char _trackLabelKey;
 static char _repeatButton;
 static char _shuffleButton;
-static char _progTimer;
 static char _sliderKey;
 
 // Other globals
 static CGRect groupFrame;
 
+static NSUInteger idx = 0;
+
+// === Make these associated objects?
 static NSTimer *seekTimer = nil;
 static BOOL wasSeeking = NO;
 
-static NSUInteger idx = 0;
-
+static NSTimer *progTimer = nil;
 static BOOL draggingSlider = NO;
+// ===
 
 /*%%%%%%%%%%%
 %% Functions
 %%%%%%%%%%%*/
 
-// This is the best damn resizing method ever.
-// Really though, Trevor Harmon's category makes the image blur.
-// Yay for StackOverflow answer!
+// This resizes my image right.
+// (To Trevor Harmon) I do not care if it doesn't handle image orientations, at least
+//					  it doesn't completely blur the stupid image when resizing.
 static UIImage *UIImageResize(UIImage *image, CGSize newSize) {
 	if (!image) return nil;
 	
@@ -363,6 +365,7 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	NSTimeInterval dur;
 	MPMusicRepeatMode repeatMode;
 	MPMusicShuffleMode shuffleMode;
+	float pla;
 	
 	if (nowPlayingItem) {
 		state = [music playbackState];
@@ -380,6 +383,7 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 		cur = [music indexOfNowPlayingItem]+1;
 		tot = [[[music queueAsQuery] items] count];
 		dur = [[nowPlayingItem valueForProperty:MPMediaItemPropertyPlaybackDuration] floatValue];
+		pla = [music currentPlaybackTime];
 		
 		repeatMode = [music repeatMode] == MPMusicRepeatModeDefault ? FAGetRepeatMode() : [music repeatMode];
 		shuffleMode = [music shuffleMode] == MPMusicShuffleModeDefault ? FAGetShuffleMode() : [music shuffleMode];
@@ -392,6 +396,7 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 		cur = -1;
 		tot = -1;
 		dur = 0;
+		pla = 0.f;
 		
 		repeatMode = FAGetRepeatMode();
 		shuffleMode = FAGetShuffleMode();
@@ -515,7 +520,26 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	MPDetailSlider *slider = [[[MPDetailSlider alloc] initWithFrame:CGRectMake(0, 30, 320, [MPDetailSlider defaultHeight])] autorelease];
 	[slider setAllowsDetailScrubbing:YES];
 	[slider setDuration:dur];
+	[slider setValue:pla animated:NO];
 	[slider setDelegate:self];
+	
+	if (state != MPMusicPlaybackStateStopped || state != MPMusicPlaybackStatePaused || state != MPMusicPlaybackStateInterrupted) {
+		if (progTimer == nil)
+			progTimer = [NSTimer scheduledTimerWithTimeInterval:1.f target:self selector:@selector(updateSlider) userInfo:nil repeats:YES];
+		else if (![progTimer isValid])
+			progTimer = [NSTimer scheduledTimerWithTimeInterval:1.f target:self selector:@selector(updateSlider) userInfo:nil repeats:YES];
+	}
+	else {
+		if (progTimer) {
+			if ([progTimer isValid]) [progTimer invalidate];
+			progTimer = nil;
+		}
+	}
+	
+	/*if (!progTimer || ![progTimer isValid]) progTimer = [NSTimer scheduledTimerWithTimeInterval:1.f target:self selector:@selector(updateSlider) userInfo:nil repeats:YES];
+	if (!(state != MPMusicPlaybackStateStopped || state != MPMusicPlaybackStatePaused || state != MPMusicPlaybackStateInterrupted)) {
+		draggingSlider = YES;
+	}*/
 	
 	objc_setAssociatedObject(self, &_sliderKey, slider, OBJC_ASSOCIATION_RETAIN);
 	[extraView addSubview:slider];
@@ -603,6 +627,7 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	NSString *artist, *album, *song;
 	NSInteger cur, tot;
 	NSTimeInterval dur;
+	float pla;
 	
 	if (item) {
 		MPMediaItemArtwork *artwork = [item valueForProperty:MPMediaItemPropertyArtwork];
@@ -618,6 +643,7 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 		cur = [music indexOfNowPlayingItem]+1;
 		tot = [[[music queueAsQuery] items] count];
 		dur = [[item valueForProperty:MPMediaItemPropertyPlaybackDuration] floatValue];
+		pla = [music currentPlaybackTime]; // 0.f always. But who knows?!
 	}
 	else {
 		artworkImage = UIImageResize([UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/noartplaceholder.png"], CGSizeMake(130, 130));
@@ -629,6 +655,7 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 		cur = -1;
 		tot = -1;
 		dur = 0;
+		pla = 0.f;
 	}
 	
 	[objc_getAssociatedObject(self, &_nowPlayingImageKey) setImage:artworkImage];
@@ -653,23 +680,63 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	
 	MPDetailSlider *slider = objc_getAssociatedObject(self, &_sliderKey);
 	[slider setDuration:dur];
+	[slider setValue:pla animated:NO];
 }
 
 %new(v@:)
 - (void)receivedStateChanged {
-	%log;
-	
 	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
 	MPMusicPlaybackState state = [music playbackState];
 	
 	const char *playImage = state==MPMusicPlaybackStatePlaying || state==MPMusicPlaybackStateSeekingForward || state==MPMusicPlaybackStateSeekingBackward ? "pause.png" : "play.png";
 	[objc_getAssociatedObject(self, &_playButtonKey) setImage:[UIImage imageWithContentsOfFile:[NSString stringWithFormat:@"/System/Library/Frameworks/MediaPlayer.framework/%s", playImage]] forState:UIControlStateNormal];
+	
+	/*if (!progTimer || ![progTimer isValid]) progTimer = [NSTimer scheduledTimerWithTimeInterval:1.f target:self selector:@selector(updateSlider) userInfo:nil repeats:YES];
+	if (!(state != MPMusicPlaybackStateStopped || state != MPMusicPlaybackStatePaused || state != MPMusicPlaybackStateInterrupted)) {
+		draggingSlider = YES;
+	}*/
+	
+	if (state != MPMusicPlaybackStateStopped || state != MPMusicPlaybackStatePaused || state != MPMusicPlaybackStateInterrupted) {
+		if (progTimer == nil)
+			progTimer = [NSTimer scheduledTimerWithTimeInterval:1.f target:self selector:@selector(updateSlider) userInfo:nil repeats:YES];
+		else if (![progTimer isValid])
+			progTimer = [NSTimer scheduledTimerWithTimeInterval:1.f target:self selector:@selector(updateSlider) userInfo:nil repeats:YES];
+	}
+	else {
+		if (progTimer) {
+			if ([progTimer isValid]) [progTimer invalidate];
+			progTimer = nil;
+		}
+	}
+}
+
+%new(v@:)
+- (void)updateSlider {
+	%log;
+	
+	if (draggingSlider)
+		return;
+	
+	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
+	MPMediaItem *item = [music nowPlayingItem];
+	
+	if (item) {
+		NSTimeInterval tim = [music currentPlaybackTime];
+		[objc_getAssociatedObject(self, &_sliderKey) setValue:(float)tim animated:YES];
+	}
 }
 
 %new(v@:@f)
-- (void)detailSlider:(UISlider *)slider didChangeValue:(CGFloat)value {
+- (void)detailSlider:(UISlider *)slider didChangeValue:(float)value {
 	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
 	[music setCurrentPlaybackTime:value];
+	
+	if (progTimer != nil) {
+		if ([progTimer isValid]) {
+			[progTimer invalidate];
+			progTimer = [NSTimer scheduledTimerWithTimeInterval:1.f target:self selector:@selector(updateSlider) userInfo:nil repeats:YES];
+		}
+	}
 }
 
 %new(v@:@)
@@ -685,17 +752,6 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 %new(v@:@)
 - (void)detailSliderTrackingDidCancel:(UISlider *)slider {
 	draggingSlider = NO;
-}
-
-%new(v@:)
-- (void)changeValueByOne {
-	%log;
-	
-	if (!draggingSlider) {
-		UISlider *slider = objc_getAssociatedObject(self, &_sliderKey);
-		NSLog(@"woot %f %f", [slider value], [slider value]+1);
-		[slider setValue:[slider value]+1 animated:YES];
-	}
 }
 
 %new(v@:@)
@@ -795,8 +851,10 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	
 	[seekTimer invalidate];
 	
-	if ([music currentPlaybackTime] > 2)
+	if ([music currentPlaybackTime] > 2) {
+		[objc_getAssociatedObject(self, &_sliderKey) setValue:0.f animated:NO];
 		[music skipToBeginning];
+	}
 	else
 		[music skipToPreviousItem];
 	
@@ -853,14 +911,12 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 		tot = -1;
 	}
 	
-	NSLog(@"cur %i tot %i", cur, tot);
 	NSString *trackText;
 	UILabel *trackLabel = objc_getAssociatedObject(self, &_trackLabelKey);
 	if (cur > -1 && tot > -1)
 		trackText = [NSString stringWithFormat:@"Track %i of %i", cur, tot];
 	else
 		trackText = @"Track -- of --";
-	NSLog(@"YO TEXT IZ %@ AND LE LBL %@", trackText, trackLabel);
 	[trackLabel setText:trackText];
 }
 
@@ -991,12 +1047,21 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 
 - (void)dealloc {
 	%log;
+	NSLog(@"DEALLOC WHAT HCHDBCHJWEBCHJEWBCEGHUW");
+	NSLog(@"[FoldMusic] Deallocating Music Folder %@", [(FAFolder *)[self folder] keyName]);
 	
 	[[NSNotificationCenter defaultCenter] removeObserver:self];
 	[[MPMusicPlayerController iPodMusicPlayer] endGeneratingPlaybackNotifications];
 	
+	draggingSlider = NO;
+	
 	objc_removeAssociatedObjects(self);
 	
+	%orig;
+}
+
+- (void)release {
+	%log;
 	%orig;
 }
 %end
@@ -1004,6 +1069,19 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 /*%%%%%%%%%%%
 %% Hooks
 %%%%%%%%%%%*/
+
+%hook SBIconController
+- (void)closeFolderAnimated:(BOOL)animated toSwitcher:(BOOL)switcher {
+	%log;
+	if (progTimer && [progTimer isValid]) {
+		NSLog(@"[fm] Invalidating prog timer");
+		[progTimer invalidate];
+		progTimer = nil;
+	}
+		
+	%orig;
+}
+%end
 
 // Add folders
 %hook SBIconListModel

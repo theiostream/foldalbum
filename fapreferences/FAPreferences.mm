@@ -219,7 +219,7 @@
 	}
 	
 	PSSpecifier *about = [PSSpecifier emptyGroupSpecifier];
-	[about setProperty:@"Idea by Ariel Aouizerate (@AAouiz), coded by theiostream (@ferreiradaniel2) in 2012." forKey:@"footerText"];
+	[about setProperty:@"Idea by Ariel Aouizerate (@AAouiz), coded by Daniel Ferreira (@ferreiradaniel2) in 2012." forKey:@"footerText"];
 	[ret addObject:about];
 	
 	return ret;
