@@ -581,6 +581,7 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	objc_setAssociatedObject(self, &_shuffleButton, shuffleButton, OBJC_ASSOCIATION_RETAIN);
 	[extraView addSubview:shuffleButton];
 	
+	[controlsView setAutoresizingMask:UIViewAutoresizingFlexibleLeftMargin];
 	[controlsView addSubview:extraView];
 	
 	objc_setAssociatedObject(self, &_controlsViewKey, controlsView, OBJC_ASSOCIATION_RETAIN);
@@ -956,12 +957,18 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 			[table setFrame:(CGRect){{-table.frame.size.width, table.frame.origin.y}, table.frame.size}];
 			[controlsView setFrame:tableFrame];
 			
+			[table setAutoresizingMask:UIViewAutoresizingFlexibleRightMargin];
+			[controlsView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
+			
 			hideTable = YES;
 		}
 		
 		else {
 			[controlsView setFrame:(CGRect){{controlsView.frame.origin.x+controlsView.frame.size.width, controlsView.frame.origin.y}, controlsView.frame.size}];
 			[table setFrame:controlFrame];
+			
+			[table setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
+			[controlsView setAutoresizingMask:UIViewAutoresizingFlexibleLeftMargin];
 			
 			hideTable = NO;
 		}
