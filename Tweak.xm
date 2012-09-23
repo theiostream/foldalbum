@@ -161,6 +161,19 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	return ret;
 }
 
+- (void)setIsOpen:(BOOL)open {
+	%log;
+	if (!open) {
+		if (progTimer && [progTimer isValid]) {
+			NSLog(@"[fm] Invalidating prog timer");
+			[progTimer invalidate];
+			progTimer = nil;
+		}
+	}
+		
+	%orig;
+}
+
 %new(@@:)
 - (MPMediaItemCollection *)mediaCollection {
 	return objc_getAssociatedObject(self, &_mediaCollectionKey);
@@ -523,7 +536,8 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	[slider setValue:pla animated:NO];
 	[slider setDelegate:self];
 	
-	if (state != MPMusicPlaybackStateStopped || state != MPMusicPlaybackStatePaused || state != MPMusicPlaybackStateInterrupted) {
+	if (state != MPMusicPlaybackStateStopped && state != MPMusicPlaybackStatePaused && state != MPMusicPlaybackStateInterrupted) {
+		NSLog(@"State %i", state);
 		if (progTimer == nil)
 			progTimer = [NSTimer scheduledTimerWithTimeInterval:1.f target:self selector:@selector(updateSlider) userInfo:nil repeats:YES];
 		else if (![progTimer isValid])
@@ -696,7 +710,8 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 		draggingSlider = YES;
 	}*/
 	
-	if (state != MPMusicPlaybackStateStopped || state != MPMusicPlaybackStatePaused || state != MPMusicPlaybackStateInterrupted) {
+	if (state != MPMusicPlaybackStateStopped && state != MPMusicPlaybackStatePaused && state != MPMusicPlaybackStateInterrupted) {
+		NSLog(@"State %i", state);
 		if (progTimer == nil)
 			progTimer = [NSTimer scheduledTimerWithTimeInterval:1.f target:self selector:@selector(updateSlider) userInfo:nil repeats:YES];
 		else if (![progTimer isValid])
@@ -730,13 +745,6 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 - (void)detailSlider:(UISlider *)slider didChangeValue:(float)value {
 	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
 	[music setCurrentPlaybackTime:value];
-	
-	if (progTimer != nil) {
-		if ([progTimer isValid]) {
-			[progTimer invalidate];
-			progTimer = [NSTimer scheduledTimerWithTimeInterval:1.f target:self selector:@selector(updateSlider) userInfo:nil repeats:YES];
-		}
-	}
 }
 
 %new(v@:@)
@@ -747,11 +755,25 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 %new(v@:@)
 - (void)detailSliderTrackingDidEnd:(UISlider *)slider {
 	draggingSlider = NO;
+	
+	if (progTimer != nil) {
+		if ([progTimer isValid]) {
+			[progTimer invalidate];
+			progTimer = [NSTimer scheduledTimerWithTimeInterval:1.f target:self selector:@selector(updateSlider) userInfo:nil repeats:YES];
+		}
+	}
 }
 
 %new(v@:@)
 - (void)detailSliderTrackingDidCancel:(UISlider *)slider {
 	draggingSlider = NO;
+	
+	if (progTimer != nil) {
+		if ([progTimer isValid]) {
+			[progTimer invalidate];
+			progTimer = [NSTimer scheduledTimerWithTimeInterval:1.f target:self selector:@selector(updateSlider) userInfo:nil repeats:YES];
+		}
+	}
 }
 
 %new(v@:@)
@@ -1070,9 +1092,10 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 %% Hooks
 %%%%%%%%%%%*/
 
-%hook SBIconController
+/*%hook SBIconController
 - (void)closeFolderAnimated:(BOOL)animated toSwitcher:(BOOL)switcher {
 	%log;
+	NSLog(@"Open Folder: %@", [self openFolder]);
 	if (progTimer && [progTimer isValid]) {
 		NSLog(@"[fm] Invalidating prog timer");
 		[progTimer invalidate];
@@ -1081,7 +1104,19 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 		
 	%orig;
 }
-%end
+
+- (void)setOpenFolder:(SBFolder *)folder {
+	%log;
+	NSLog(@"Open Folder: %@", [self openFolder]);
+	if (progTimer && [progTimer isValid]) {
+		NSLog(@"[fm] Invalidating prog timer");
+		[progTimer invalidate];
+		progTimer = nil;
+	}
+		
+	%orig;
+}
+%end*/
 
 // Add folders
 %hook SBIconListModel
