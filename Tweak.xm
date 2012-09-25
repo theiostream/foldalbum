@@ -1184,17 +1184,19 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 - (void)iconImageDidUpdate:(SBIcon *)icon {
 	%orig;
 	
-	UIImageView *imageView = MSHookIvar<UIImageView *>(self, "_iconImageView");
-	
-	CGRect fr = [imageView frame];
-	fr.origin.y -= 1;
-	fr.origin.x -= 1;
-	fr.size.height += 3;
-	fr.size.width += 3;
-	[imageView setFrame:fr];
-	
-	[[imageView layer] setCornerRadius:8.f];
-	[[imageView layer] setMasksToBounds:YES];
+	if ([[self folder] isKindOfClass:%c(FAFolder)]) {
+		UIImageView *imageView = MSHookIvar<UIImageView *>(self, "_iconImageView");
+		
+		CGRect fr = [imageView frame];
+		fr.origin.y -= 1;
+		fr.origin.x -= 1;
+		fr.size.height += 3;
+		fr.size.width += 3;
+		[imageView setFrame:fr];
+		
+		[[imageView layer] setCornerRadius:8.f];
+		[[imageView layer] setMasksToBounds:YES];
+	}
 }
 %end
 
