@@ -101,14 +101,18 @@ static FANotificationHandler *sharedInstance_ = nil;
 // Maybe check out how Apple *fully* does its relayouting.
 // Thanks BigBoss! (stolen from libhide)
 - (void)relayout {
-	SBIconModel *iconModel = [objc_getClass("SBIconModel") sharedInstance];
+	SBIconModel *iconModel = kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0 ? MSHookIvar<SBIconModel *>([objc_getClass("SBIconController") sharedInstance], "_iconModel") : [objc_getClass("SBIconModel") sharedInstance];
 	
 	NSSet *_visibleIconTags = MSHookIvar<NSSet *>(iconModel, "_visibleIconTags");
 	NSSet *_hiddenIconTags  = MSHookIvar<NSSet *>(iconModel, "_hiddenIconTags");
 	
 	if (_visibleIconTags && _hiddenIconTags) {
 		[iconModel setVisibilityOfIconsWithVisibleTags:_visibleIconTags hiddenTags:_hiddenIconTags];
-		[iconModel relayout];
+		
+		if (kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0)
+			[iconModel layout];
+		else
+			[iconModel relayout];
 	}
 }
 @end

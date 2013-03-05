@@ -116,11 +116,11 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
     	[[__imageView layer] setBorderColor:[[UIColor whiteColor] CGColor]];
     	[[self contentView] addSubview:__imageView];
 		
-		UIImage *ind_ = [UIImage imageWithContentsOfFile:@"/System/Library/PrivateFrameworks/iPodUI.framework/NowPlayingListItemIcon.png"];
+		/*UIImage *ind_ = [UIImage imageWithContentsOfFile:@"/System/Library/PrivateFrameworks/iPodUI.framework/NowPlayingListItemIcon.png"];
     	_speaker = [[[UIImageView alloc] initWithFrame:CGRectMake((_label.frame.size.width-50)+1, _label.frame.origin.y, 28, 24)] autorelease];
     	[_speaker setImage:ind_];
     	[_speaker setHidden:YES];
-    	[self addSubview:_speaker];
+    	[self addSubview:_speaker];*/
 		
 		CGFloat wid = (isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd;
 		CGMutablePathRef path = CGPathCreateMutable();
@@ -193,10 +193,6 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
 	}];
 }
 
-- (void)setShowsSpeaker:(BOOL)speaker {
-	[_speaker setHidden:!speaker];
-}
-
 - (NSString *)valueForProperty {
 	id value = [_item valueForProperty:_property];
 	
@@ -205,7 +201,7 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
 		int tsec = (int)round([value doubleValue]);
 		int min = tsec/60;
 		int sec = tsec-min*60;
-		char* zero = sec<10 ? "0" : ""; // FIXME: This seems wrong.
+		char *zero = sec<10 ? "0" : ""; // FIXME: This seems wrong.
 		
 		return [NSString stringWithFormat:@"%i:%s%i", min, zero, sec];
 	}

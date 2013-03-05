@@ -27,6 +27,8 @@
 ##  matoe@matoe.co.cc
 ##########
 
+TARGET = :clang
+
 include theos/makefiles/common.mk
 
 # Yup. No longer foldalbumd.

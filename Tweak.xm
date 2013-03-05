@@ -2,10 +2,12 @@
 	Tweak.xm
 	
 	FoldMusic
-  	version 1.3.0, July 15th, 2012
-
-  Copyright (C) 2012 Daniel Ferreira
-  				     Colégio Visconde de Porto Seguro
+  	version 1.4.0, February 24th, 2013
+  
+  Copyright (C) 2012-2013 Daniel Ferreira
+  						  Ariel Aouizerate
+  				     	  Colégio Visconde de Porto Seguro
+  				     	  BACON CODING COMPANY, LLC
   					 
   Special thanks:
   	David Murray "Cykey" (for being a friend and contributing to the project in tiny but awesome ways)
@@ -30,7 +32,7 @@
   3. This notice may not be removed or altered from any source distribution.
 
   theiostream
-  matoe@matoe.co.cc
+  q@theiostream.com
 **/
 
 /*%%%%%%%%%%%
@@ -51,8 +53,8 @@
 - (BOOL)isWildcat;
 @end
 
-// From IconSupport; I am on a BIG hurry sorry world.
 #define isiPad() ([UIDevice instancesRespondToSelector:@selector(isWildcat)] && [[UIDevice currentDevice] isWildcat])
+#define isPhone5() (([[UIScreen mainScreen] bounds].size.height-568)?NO:YES)
 
 // From CyDelete: DHowett is awesome.
 #define SBLocalizedString(key) \
@@ -80,8 +82,11 @@ static char _trackLabelKey;
 static char _repeatButton;
 static char _shuffleButton;
 static char _sliderKey;
+static char _wrapperKey;
+static char _subtitleLabelKey;
 
 // Other globals
+static char _iconImageViewKey;
 static CGRect groupFrame;
 
 static NSUInteger idx = 0;
@@ -145,16 +150,39 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 %% Subclasses
 %%%%%%%%%%%*/
 
+// thanks dhowett
+%subclass FAFolderIcon : SBFolderIcon
+- (BOOL)allowsUninstall {
+	return YES;
+}
+
+- (NSString *)uninstallAlertTitle {
+	return [NSString stringWithFormat:SBLocalizedString(@"UNINSTALL_ICON_TITLE"), [self displayName]];
+}
+
+- (NSString *)uninstallAlertBody {
+	return [NSString stringWithFormat:@"Are you sure you want to delete the \"%@\" folder? Your music data will be preserved.", [self displayName]];
+}
+
+- (void)completeUninstall {
+	%orig;
+	
+	// FIXME: Use FAPreferencesHandler instead of FANotificationHandler
+	[[FANotificationHandler sharedInstance] removeKeyWithMessageName:nil userInfo:[NSDictionary dictionaryWithObject:[(FAFolder *)[self folder] keyName] forKey:@"Key"]];
+}
+%end
+
 %subclass FAFolder : SBFolder
 - (Class)folderViewClass {
 	return %c(FAFolderView);
 }
 
+// This is somehow wrong.
 - (NSArray *)allIcons {
 	NSMutableArray *ret = [NSMutableArray array];
 	SBIcon *empty = [[[%c(SBIcon) alloc] init] autorelease];
 	
-	int iconsTarget = isiPad() ? 15 : 11;
+	int iconsTarget = isiPad() ? 19 : isPhone5() ? 15 : 11;
 	for (int i=0; i<iconsTarget; i++)
 		[ret addObject:empty];
 		
@@ -201,8 +229,27 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 }
 %end
 
-// TODO: Check exactly how SBNewsstandFolderView handles this
+%hook SBIconController
+- (void)willAnimateRotationToInterfaceOrientation:(int)orientation duration:(double)duration {
+	%log;
+	%orig;
+	
+	if (kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0) {
+		SBFolderView *folderView = MSHookIvar<SBFolderView *>(self, "_folderView");
+		if ([folderView isKindOfClass:%c(FAFolderView)]) {
+			[(FAFolderView *)folderView rotateToOrientation:orientation];
+		}
+	}
+}
+%end
+
+// TODO: Check exactly how SBNewsstandFolderView handles all this shit! :P
+// Meanwhile we seem to be fine...
 %subclass FAFolderView : SBFolderView
+- (void)setRows:(NSUInteger)rows notchInfo:(SBNotchInfo)info orientation:(int)orientation {
+	%orig(kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0 ? (isiPad() ? 20 : (isPhone5() ? 16 : 16)) : rows, info, orientation);
+}
+
 %new(@@:)
 - (FAFolder *)folder {
 	return MSHookIvar<FAFolder *>(self, "_folder");
@@ -217,6 +264,8 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	%log;
 	
 	if ((self = %orig)) {
+		// Thanks to @nosdrew for this line which removes foldalbumd and fixes the most
+		// annoying bug ever!
 		[[UIApplication sharedApplication] launchMusicPlayerSuspended];
 		
 		[[MPMusicPlayerController iPodMusicPlayer] beginGeneratingPlaybackNotifications];
@@ -230,7 +279,7 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 - (void)textFieldDidEndEditing:(UITextField *)textField {
 	UILabel *groupLabel = [self groupLabel];
 	NSString *key = [(FAFolder *)[self folder] keyName];
-	NSString *res = [[textField text] isEqualToString:@""] ? key : [textField text];	
+	NSString *res = [[textField text] isEqualToString:@""] ? key : [textField text];
 	
 	NSDictionary *update = [NSDictionary dictionaryWithObject:res forKey:@"fakeTitle"];
 	[[FAPreferencesHandler sharedInstance] optimizedUpdateKey:key withDictionary:update];
@@ -252,8 +301,37 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	[groupLabel setHidden:editing];
 }
 
+%new(v@:i)
+- (void)rotateToOrientation:(int)orientation {
+	%log;
+	
+	if (isiPad()) {
+		CGFloat width = UIInterfaceOrientationIsPortrait(orientation) ? 768 : 1024;
+		CGFloat height = 546;
+		CGRect subtitleLabelFrame = [objc_getAssociatedObject(self, &_subtitleLabelKey) frame];
+		
+		UIView *wrapper = objc_getAssociatedObject(self, &_wrapperKey);
+		UIView *table = objc_getAssociatedObject(self, &_dataTableKey);
+		UIView *control = objc_getAssociatedObject(self, &_controlsViewKey);
+		
+		CGSize size = (CGSize){UIInterfaceOrientationIsPortrait(orientation) ? 728 : 984, height-(subtitleLabelFrame.origin.y+25)};
+		
+		BOOL isLeft = table.frame.origin.x < 0;
+		CGPoint tableOrigin = CGPointMake(isLeft ? -size.width : 20, table.frame.origin.y);
+		CGPoint controlOrigin = CGPointMake(isLeft ? 20 : tableOrigin.x+size.width+20.f, control.frame.origin.y);
+		
+		[table setFrame:(CGRect){tableOrigin, size}];
+		[control setFrame:(CGRect){controlOrigin, size}];
+		[wrapper setFrame:(CGRect){wrapper.frame.origin, {width, height}}];
+	}
+}
+
 - (void)setIconListView:(UIView *)view {
+	CGFloat width = kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0 ? (isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320) : self.frame.size.width;
+	CGFloat height = kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0 ? isiPad() ? 546 : isPhone5() ? 374 : 299 : self.frame.size.height;
 	idx = 0;
+	
+	UIView *wrapper = [[[UIView alloc] initWithFrame:CGRectMake(0, 0, width, height)] autorelease];
 	
 	SBFolder *folder = [self folder];
 	MPMediaItemCollection *collection = [(FAFolder *)folder mediaCollection];
@@ -263,7 +341,11 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	// TODO: Find somewhere to release this unused label.
 	
 	CGRect grFr = [groupLabel_ frame];
-	if ([collection isKindOfClass:[MPMediaPlaylist class]]) grFr.origin.y += grFr.size.height/2-8;
+	if (kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0) {
+		if (![collection isKindOfClass:[MPMediaPlaylist class]]) grFr.origin.y += 8.f;
+		if (!isiPad()) grFr.origin.x = 20.f;
+	}
+	else if ([collection isKindOfClass:[MPMediaPlaylist class]]) grFr.origin.y += grFr.size.height/2 - 8;
 	
 	SBFolderTitleLabel *groupLabel = [[[%c(SBFolderTitleLabel) alloc] initWithFrame:grFr] autorelease];
 	[groupLabel setFont:[groupLabel_ font]];
@@ -278,6 +360,7 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	if (MSHookIvar<BOOL>(self, "_isEditing"))
 		[groupLabel setHidden:YES];
 	
+	NSLog(@"%@", NSStringFromCGRect(groupLabel.frame));
 	CGRect groupRect = isiPad() ?
 		(CGRect){{20, groupLabel.frame.origin.y}, {648, 22}} :
 		(CGRect){{groupLabel.frame.origin.x-7, groupLabel.frame.origin.y}, {230, 20}};
@@ -285,7 +368,7 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	[groupLabel setFrame:groupRect];
 	groupFrame = [groupLabel frame];
 	
-	CGPoint subtitlePoint = CGPointMake(groupLabel.frame.origin.x, groupLabel_.frame.origin.y+23);
+	CGPoint subtitlePoint = CGPointMake(groupLabel.frame.origin.x, groupLabel.frame.origin.y+23);
 	CGSize subtitleSize = isiPad() ?
 		CGSizeMake(668, 16) :
 		CGSizeMake(230, 16);
@@ -297,7 +380,7 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 		subtitleLabel.origin.y -= (subtitleLabel.origin.y-[[groupLabel font] pointSize]);
 	}
 	
-	[self addSubview:groupLabel];
+	[wrapper addSubview:groupLabel];
 	objc_setAssociatedObject(self, &_labelKey, groupLabel, OBJC_ASSOCIATION_RETAIN);
 	
 	UITextField *&textField = MSHookIvar<UITextField *>(self, "_textField");
@@ -317,7 +400,8 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 			[artistLabel setFrame:(CGRect){artistLabel.frame.origin, {artistLabel.frame.size.width, [[artistLabel font] pointSize]}}];
 		}
 		
-		[self addSubview:artistLabel];
+		objc_setAssociatedObject(self, &_subtitleLabelKey, artistLabel, OBJC_ASSOCIATION_RETAIN);
+		[wrapper addSubview:artistLabel];
 	}
 	
 	UIView *controllerContent = [[[UIView alloc] initWithFrame:CGRectMake((isiPad() ? 683 : 255), (groupLabel.bounds.origin.y+5), 60, 55)] autorelease];
@@ -337,15 +421,18 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	
 	[controllerContent addSubview:musicButton];
 	[controllerContent addSubview:arrowButton];
-	[self addSubview:controllerContent];
+	[wrapper addSubview:controllerContent];
 	
-	CGRect tableFrame = CGRectMake((isiPad() ? 20 : -1), subtitleLabel.origin.y+25, (isiPad() ? UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 728 : 984 : 322), self.bounds.size.height-(subtitleLabel.origin.y+25));
+	CGRect tableFrame = CGRectMake((isiPad() ? 20 : -1), subtitleLabel.origin.y+25, (isiPad() ? UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 728 : 984 : 322), height-(subtitleLabel.origin.y+25));
+	NSLog(@"tableFrame: %@", NSStringFromCGRect(tableFrame));
 	UITableView *dataTable = [[[UITableView alloc] initWithFrame:tableFrame style:UITableViewStylePlain] autorelease];
+	NSLog(@"table frame: %@", NSStringFromCGRect([dataTable frame]));
+	
 	[dataTable setDelegate:self];
 	[dataTable setDataSource:self];
 	[dataTable setBackgroundColor:[UIColor clearColor]];
 	[dataTable setSeparatorColor:UIColorFromHexWithAlpha(0xFFFFFF, 0.37)];
-	[dataTable setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
+	if (kCFCoreFoundationVersionNumber < kCFCoreFoundationVersionNumber_iOS_6_0) [dataTable setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
 	
 	[[dataTable layer] setBorderWidth:.8f];
 	[[dataTable layer] setBorderColor:[UIColorFromHexWithAlpha(0xFFFFFF, 0.37) CGColor]];
@@ -359,7 +446,7 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	[dataTable addGestureRecognizer:lef];
 	
 	objc_setAssociatedObject(self, &_dataTableKey, dataTable, OBJC_ASSOCIATION_RETAIN);
-	[self addSubview:dataTable];
+	[wrapper addSubview:dataTable];
 	
 	//%%%%%%%%%
 	// Controls View
@@ -415,7 +502,7 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 		shuffleMode = FAGetShuffleMode();
 	}
 	
-	UIView *controlsView = [[[UIView alloc] initWithFrame:(CGRect){{tableFrame.origin.x+tableFrame.size.width, tableFrame.origin.y}, tableFrame.size}] autorelease];
+	UIView *controlsView = [[[UIView alloc] initWithFrame:(CGRect){{isiPad() ? tableFrame.origin.x+tableFrame.size.width+20.f : tableFrame.origin.x+tableFrame.size.width, tableFrame.origin.y}, tableFrame.size}] autorelease];
 	[[controlsView layer] setBorderWidth:.8f];
 	[[controlsView layer] setBorderColor:[UIColorFromHexWithAlpha(0xFFFFFF, 0.37) CGColor]];
 	
@@ -510,7 +597,7 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	CGPathRelease(path);
 	[[controlsView layer] addSublayer:shape];
 	
-	UIView *extraView = [[[UIView alloc] initWithFrame:CGRectMake(0, 155, 320, self.frame.size.height-155)] autorelease];
+	UIView *extraView = [[[UIView alloc] initWithFrame:CGRectMake(0, 155, 320, height-155)] autorelease];
 	
 	NSString *trackText;
 	if (cur > -1 && tot > -1)
@@ -581,11 +668,14 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	objc_setAssociatedObject(self, &_shuffleButton, shuffleButton, OBJC_ASSOCIATION_RETAIN);
 	[extraView addSubview:shuffleButton];
 	
-	[controlsView setAutoresizingMask:UIViewAutoresizingFlexibleLeftMargin];
+	if (kCFCoreFoundationVersionNumber < kCFCoreFoundationVersionNumber_iOS_6_0) [controlsView setAutoresizingMask:UIViewAutoresizingFlexibleLeftMargin];
 	[controlsView addSubview:extraView];
 	
 	objc_setAssociatedObject(self, &_controlsViewKey, controlsView, OBJC_ASSOCIATION_RETAIN);
-	[self addSubview:controlsView];
+	[wrapper addSubview:controlsView];
+	
+	objc_setAssociatedObject(self, &_wrapperKey, wrapper, OBJC_ASSOCIATION_RETAIN);
+	[self addSubview:wrapper];
 }
 
 %new(v@:)
@@ -951,24 +1041,30 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	UIView *controlsView = objc_getAssociatedObject(self, &_controlsViewKey);
 	CGRect controlFrame = [controlsView frame];
 	
+	NSLog(@"%@ %@", table, controlsView);
+	
 	__block BOOL hideTable;
 	[UIView animateWithDuration:.2f animations:^{
 		if (tableFrame.origin.x >= (isiPad() ? 20 : -1)) {
 			[table setFrame:(CGRect){{-table.frame.size.width, table.frame.origin.y}, table.frame.size}];
 			[controlsView setFrame:tableFrame];
 			
-			[table setAutoresizingMask:UIViewAutoresizingFlexibleRightMargin];
-			[controlsView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
+			if (kCFCoreFoundationVersionNumber < kCFCoreFoundationVersionNumber_iOS_6_0) {
+				[table setAutoresizingMask:UIViewAutoresizingFlexibleRightMargin];
+				[controlsView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
+			}
 			
 			hideTable = YES;
 		}
 		
 		else {
-			[controlsView setFrame:(CGRect){{controlsView.frame.origin.x+controlsView.frame.size.width, controlsView.frame.origin.y}, controlsView.frame.size}];
+			[controlsView setFrame:(CGRect){{isiPad() ? controlsView.frame.origin.x+controlsView.frame.size.width+20.f : controlsView.frame.origin.x+controlsView.frame.size.width, controlsView.frame.origin.y}, controlsView.frame.size}];
 			[table setFrame:controlFrame];
 			
-			[table setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
-			[controlsView setAutoresizingMask:UIViewAutoresizingFlexibleLeftMargin];
+			if (kCFCoreFoundationVersionNumber < kCFCoreFoundationVersionNumber_iOS_6_0) {
+				[table setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
+				[controlsView setAutoresizingMask:UIViewAutoresizingFlexibleLeftMargin];
+			}
 			
 			hideTable = NO;
 		}
@@ -1020,7 +1116,8 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
 	static NSString *CellIdentifier = @"FAFolderCellIdentifier";
 	
-	NSArray *items = [[(FAFolder *)[self folder] mediaCollection] items];
+	MPMediaItemCollection *collection = [(FAFolder *)[self folder] mediaCollection];
+	NSArray *items = [collection items];
 	MPMediaItem *item = [items objectAtIndex:[indexPath row]];
 	
 	FAFolderCell *cell = (FAFolderCell *)[tableView dequeueReusableCellWithIdentifier:CellIdentifier];
@@ -1075,10 +1172,6 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 }
 
 - (void)dealloc {
-	%log;
-	NSLog(@"DEALLOC WHAT HCHDBCHJWEBCHJEWBCEGHUW");
-	NSLog(@"[FoldMusic] Deallocating Music Folder %@", [(FAFolder *)[self folder] keyName]);
-	
 	[[NSNotificationCenter defaultCenter] removeObserver:self];
 	[[MPMusicPlayerController iPodMusicPlayer] endGeneratingPlaybackNotifications];
 	
@@ -1086,11 +1179,6 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	
 	objc_removeAssociatedObjects(self);
 	
-	%orig;
-}
-
-- (void)release {
-	%log;
 	%orig;
 }
 %end
@@ -1143,8 +1231,8 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	[folder setKeyName:keyName];
 	[folder setMediaCollection:collection];
 	
-	SBFolderIcon *icon = [[[%c(SBFolderIcon) alloc] initWithFolder:folder] autorelease];
-	[icon setDelegate:[%c(SBIconController) sharedInstance]];
+	FAFolderIcon *icon = [[[%c(FAFolderIcon) alloc] initWithFolder:folder] autorelease];
+	if (kCFCoreFoundationVersionNumber < kCFCoreFoundationVersionNumber_iOS_6_0) [icon setDelegate:[%c(SBIconController) sharedInstance]];
 	
 	NSUInteger modelIndex = [self index];
 	NSUInteger iconIndex = [self firstFreeSlotIndex];
@@ -1159,24 +1247,31 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 		// NOTE: Upon calling -addIcon:, the icon gets placed into some weird place.
 		// This is fixed by calling -insertIcon:atIndex:, yet we might be doing
 		// something which probably breaks it. It should be fixed.
-		[self insertIcon:icon atIndex:&iconIndex];
+		if (kCFCoreFoundationVersionNumber < kCFCoreFoundationVersionNumber_iOS_6_0)
+			[self insertIcon:icon atIndex:&iconIndex];
+		else
+			[[[[%c(SBIconController) sharedInstance] rootIconLists] objectAtIndex:[self index]] insertIcon:icon atIndex:iconIndex moveNow:YES];
 	}
 	
-	else
-		[self insertIcon:icon atIndex:&index];
+	else {
+		if (kCFCoreFoundationVersionNumber < kCFCoreFoundationVersionNumber_iOS_6_0)
+			[self insertIcon:icon atIndex:&index];
+		else
+			[[[[%c(SBIconController) sharedInstance] rootIconLists] objectAtIndex:[self index]] insertIcon:icon atIndex:index moveNow:YES];
+	}
 	
 	[[%c(SBIconController) sharedInstance] updateCurrentIconListIndexAndVisibility];
+	NSLog(@"[fm] omg!");
 }
 %end
 
 %hook SBFolderIconView
 - (BOOL)canReceiveGrabbedIcon:(id)icon {
-	if ([[self folder] isKindOfClass:%c(FAFolder)])
+	if ([[self icon] isKindOfClass:%c(FAFolderIcon)])
 		return NO;
 	
-	if ([icon isKindOfClass:%c(SBFolderIcon)])
-		if ([[icon folder] isKindOfClass:%c(FAFolder)])
-			return NO;
+	if ([icon isKindOfClass:%c(FAFolderIcon)])
+		return NO;
 	
 	return %orig;
 }
@@ -1184,23 +1279,44 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 - (void)iconImageDidUpdate:(SBIcon *)icon {
 	%orig;
 	
-	if ([[self folder] isKindOfClass:%c(FAFolder)]) {
-		UIImageView *imageView = MSHookIvar<UIImageView *>(self, "_iconImageView");
-		
-		CGRect fr = [imageView frame];
-		fr.origin.y -= 1;
-		fr.origin.x -= 1;
-		fr.size.height += 3;
-		fr.size.width += 3;
-		[imageView setFrame:fr];
-		
+	if ([icon isKindOfClass:%c(FAFolderIcon)]) {
+		CGFloat fr = isiPad() ? 67.7 : 52.7;
+		UIImageView *imageView = [[[UIImageView alloc] initWithFrame:CGRectMake(3.2, 2.2, fr, fr)] autorelease];
 		[[imageView layer] setCornerRadius:8.f];
 		[[imageView layer] setMasksToBounds:YES];
+		
+		UIImage *targetImage = nil;
+		MPMediaItemCollection *collection = [(FAFolder *)[self folder] mediaCollection];
+				
+		if (![collection isKindOfClass:[MPMediaPlaylist class]]) {
+			MPMediaItem *_item = [[collection items] objectAtIndex:0];
+			MPMediaItemArtwork *artwork = [_item valueForProperty:MPMediaItemPropertyArtwork];
+			
+			UIImage *artworkImage = [artwork imageWithSize:[imageView frame].size];
+			if (artworkImage) {
+				targetImage = UIImageResize(artworkImage, [imageView frame].size);
+			}
+		}
+		
+		targetImage = targetImage ? targetImage : UIImageResize([UIImage imageWithContentsOfFile:@"/System/Library/PrivateFrameworks/iPodUI.framework/CoverFlowPlaceHolder44.png"], [imageView frame].size);
+		
+		[imageView setImage:targetImage];
+		
+		objc_setAssociatedObject(self, &_iconImageViewKey, imageView, OBJC_ASSOCIATION_RETAIN);
+		[self addSubview:imageView];
+	}
+	
+	else {
+		UIImageView *imageView = objc_getAssociatedObject(self, &_iconImageViewKey);
+		if (imageView != nil && [[self subviews] containsObject:imageView]) {
+			[imageView removeFromSuperview];
+			objc_setAssociatedObject(self, &_iconImageViewKey, nil, OBJC_ASSOCIATION_ASSIGN);
+		}
 	}
 }
 %end
 
-%hook SBFolderIcon
+/*%hook SBFolderIcon
 - (UIImage *)gridImageWithSkipping:(BOOL)skipping {
 	if ([[self folder] isKindOfClass:%c(FAFolder)]) {
 		UIImage *targetImage;
@@ -1220,7 +1336,7 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 			}
 		}
 		
-		targetImage = UIImageResize([UIImage imageWithContentsOfFile:@"/System/Library/PrivateFrameworks/iPodUI.framework/CoverFlowPlaceHolder44.png"], iconSize);
+		targetImage = (UIImageResize([UIImage imageWithContentsOfFile:@"/System/Library/PrivateFrameworks/iPodUI.framework/CoverFlowPlaceHolder44.png"], iconSize));
 		
 		got_it:
 		return targetImage;
@@ -1228,40 +1344,7 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 
 	return %orig;
 }
-%end
-
-// Thanks DHowett! (stolen from cydelete)
-%hook SBFolderIcon
-- (BOOL)allowsUninstall {
-	if ([[self folder] isKindOfClass:%c(FAFolder)])
-		return YES;
-	
-	return %orig;
-}
-
-- (NSString *)uninstallAlertTitle {
-	if ([[self folder] isKindOfClass:%c(FAFolder)])
-		return [NSString stringWithFormat:SBLocalizedString(@"UNINSTALL_ICON_TITLE"), [self displayName]];
-	
-	return %orig;
-}
-
-- (NSString *)uninstallAlertBody {
-	if ([[self folder] isKindOfClass:%c(FAFolder)])
-		return [NSString stringWithFormat:@"Are you sure you want to delete the \"%@\" folder? Your music data will be preserved.", [self displayName]];
-	
-	return %orig;
-}
-
-- (void)completeUninstall {
-	%orig;
-	
-	if ([[self folder] isKindOfClass:%c(FAFolder)]) {
-		// FIXME: Use FAPreferencesHandler instead of FANotificationHandler
-		[[FANotificationHandler sharedInstance] removeKeyWithMessageName:nil userInfo:[NSDictionary dictionaryWithObject:[(FAFolder *)[self folder] keyName] forKey:@"Key"]];
-	}
-}
-%end
+%end*/
 
 %hook SBIconController
 %new(@@:)
@@ -1339,24 +1422,22 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 		for (NSUInteger j=0; j<iconsCount; j++) {
 			//NSLog(@"[!] Icon Index %i", j);
 			SBIcon *icon = [icons objectAtIndex:j];
-			if ([icon isKindOfClass:%c(SBFolderIcon)]) {
-				FAFolder *folder = (FAFolder *)[(SBFolderIcon *)icon folder];
+			if ([icon isKindOfClass:%c(FAFolderIcon)]) {
+				FAFolder *folder = (FAFolder *)[(FAFolderIcon *)icon folder];
 				
-				if ([folder isKindOfClass:%c(FAFolder)]) {
-					NSString *iconDisplayName = [folder keyName];
-					if (![handler keyExists:iconDisplayName])
-						continue;
-					
-					NSInteger listIndex = [model index];
-					NSInteger iconIndex = [model indexForIcon:icon];
-					
-					NSMutableDictionary *iconData = [NSMutableDictionary dictionary];
-					[iconData setObject:[NSNumber numberWithInteger:listIndex] forKey:@"listIndex"];
-					[iconData setObject:[NSNumber numberWithInteger:iconIndex] forKey:@"iconIndex"];
-					[iconData setObject:[NSKeyedArchiver archivedDataWithRootObject:[folder mediaCollection]] forKey:@"mediaCollection"];
-					
-					[handler optimizedUpdateKey:iconDisplayName withDictionary:iconData];
-				}
+				NSString *iconDisplayName = [folder keyName];
+				if (![handler keyExists:iconDisplayName])
+					continue;
+				
+				NSInteger listIndex = [model index];
+				NSInteger iconIndex = [model indexForIcon:icon];
+				
+				NSMutableDictionary *iconData = [NSMutableDictionary dictionary];
+				[iconData setObject:[NSNumber numberWithInteger:listIndex] forKey:@"listIndex"];
+				[iconData setObject:[NSNumber numberWithInteger:iconIndex] forKey:@"iconIndex"];
+				[iconData setObject:[NSKeyedArchiver archivedDataWithRootObject:[folder mediaCollection]] forKey:@"mediaCollection"];
+				
+				[handler optimizedUpdateKey:iconDisplayName withDictionary:iconData];
 			}
 		}
 	}
@@ -1367,19 +1448,35 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	[self saveAlbumFolders];
 }
 
+%group FMSBIconModel5x
 - (void)relayout {
 	%orig;
 	[[%c(SBIconController) sharedInstance] commitAlbumFolders];
 }
 %end
 
-/*// TODO: SBMediaIdkNotification
-%hook SBMediaController
-- (void)setNowPlayingInfo:(id)info {
-	NSLog(@"[FoldMusic] Set Now Playing Info");
-	[[NSNotificationCenter defaultCenter] postNotificationName:@"FAChangedPlayingInfo" object:nil];
+%group FMSBIconModel6x
+- (void)layout {
 	%orig;
+	[[%c(SBIconController) sharedInstance] commitAlbumFolders];
 }
+%end
+%end
+
+/*%group FMUIImage6x
+%hook UIImage
+%new({CGRect={CGPoint=ff}{CGSize=ff}}@:I@I)
++ (CGRect)rectAtIndex:(unsigned)index forImage:(id)image maxCount:(unsigned)count { return CGRectZero; }
+
+%new(I@:)
+- (NSUInteger)numberOfRows { return 0; }
+
+%new(I@:)
+- (NSUInteger)numberOfColumns { return 0; }
+
+%new(I@:)
+- (NSUInteger)numberOfCells { return 0; }
+%end
 %end*/
 
 %ctor {
@@ -1388,6 +1485,14 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 	[[objc_getClass("ISIconSupport") sharedInstance] addExtension:@"am.theiostre.foldalbum"];
 	
 	// Init hooks
+	if (kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0) {
+		%init(FMSBIconModel6x);
+	}
+	else {
+		%init(FMSBIconModel5x);
+		//%init(FAFolderOS5x);
+	}
+	
 	%init;
 	
 	// TODO: FANotificationHandler should setup notification crap by itself, not through Tweak.xm

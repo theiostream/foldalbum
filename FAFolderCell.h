@@ -57,5 +57,4 @@
 - (void)setDetailProperty:(NSString *)property change:(BOOL)change;
 - (NSString *)valueForProperty;
 - (void)setShapeLayer:(CAShapeLayer *)shape;
-- (void)setShowsSpeaker:(BOOL)speaker;
 @end

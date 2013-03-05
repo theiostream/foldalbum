@@ -26,9 +26,22 @@
   matoe@matoe.co.cc
 **/
 
+#ifndef kCFCoreFoundationVersionNumber_iOS_6_0
+#define kCFCoreFoundationVersionNumber_iOS_6_0 793.00
+#endif
+
 #import <MediaPlayer/MediaPlayer.h>
 #import <AppSupport/CPDistributedMessagingCenter.h>
 #import "FACalloutView.h"
+
+typedef struct {
+	int direction;
+	CGRect rect;
+} SBNotchInfo;
+
+typedef struct {
+    UIImage *image;
+} MPMediaItemArtworkInternal;
 
 @interface SBApplication : NSObject
 @end
@@ -51,6 +64,7 @@
 @end
 
 @interface SBFolder : NSObject
+- (Class)listModelClass;
 - (NSString *)displayName;
 - (void)setDisplayName:(NSString *)displayName;
 @end
@@ -69,6 +83,7 @@
 - (FAFolder *)folder;
 - (UILabel *)groupLabel;
 - (NSArray *)itemKeys;
+- (void)rotateToOrientation:(int)orientation;
 @end
 
 @interface SBIcon : NSObject
@@ -89,6 +104,7 @@
 @interface SBFolderIconView : SBIconView
 - (BOOL)canReceiveGrabbedIcon:(id)icon;
 - (SBFolder *)folder;
+- (SBIcon *)icon;
 @end
 
 @interface SBIconViewMap
@@ -110,7 +126,7 @@
 
 @interface SBIconListView : UIView
 - (SBIconListModel *)model;
-- (void)layoutIconsNow;
+- (void)insertIcon:(SBIcon *)icon atIndex:(NSUInteger)index moveNow:(BOOL)moveNow;
 @end
 
 @interface SBIconController : NSObject
@@ -131,6 +147,7 @@
 - (void)saveIconState;
 - (void)saveAlbumFolders;
 - (void)noteIconStateChangedExternally;
+- (void)layout;
 - (void)relayout;
 - (void)setVisibilityOfIconsWithVisibleTags:(NSSet *)arg1 hiddenTags:(NSSet *)arg2;
 @end
@@ -142,10 +159,16 @@
 - (void)setDelegate:(id)delegate;
 @end
 
+@interface SBIconGridImage : UIImage
+@end
+
 @interface UIApplication (FASpringBoard)
 - (void)launchMusicPlayerSuspended;
 @end
 
 @interface MPMusicPlayerController (FAMusicPlayerControllerPrivate)
 - (MPMediaQuery *)queueAsQuery;
+@end
+
+@interface FAFolderIcon : SBFolderIcon
 @end
