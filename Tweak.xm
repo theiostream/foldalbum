@@ -54,7 +54,7 @@
 @end
 
 #define isiPad() ([UIDevice instancesRespondToSelector:@selector(isWildcat)] && [[UIDevice currentDevice] isWildcat])
-#define isPhone5() (([[UIScreen mainScreen] bounds].size.height-568)?NO:YES)
+#define isPhone5() ( fabs( ( double )[ [ UIScreen mainScreen ] bounds ].size.height - ( double )568 ) < DBL_EPSILON )
 
 // From CyDelete: DHowett is awesome.
 #define SBLocalizedString(key) \
@@ -247,7 +247,8 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 // Meanwhile we seem to be fine...
 %subclass FAFolderView : SBFolderView
 - (void)setRows:(NSUInteger)rows notchInfo:(SBNotchInfo)info orientation:(int)orientation {
-	%orig(kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0 ? (isiPad() ? 20 : (isPhone5() ? 16 : 16)) : rows, info, orientation);
+	NSLog(@"ac3xx: %d %d %d -- %i", kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0, isiPad(), isPhone5(), (kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0 ? (isiPad() ? 20 : (isPhone5() ? 20 : 16)) : rows));
+	%orig(kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0 ? (isiPad() ? 20 : (isPhone5() ? 24 : 16)) : rows, info, orientation);
 }
 
 %new(@@:)
@@ -328,7 +329,8 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 
 - (void)setIconListView:(UIView *)view {
 	CGFloat width = kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0 ? (isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320) : self.frame.size.width;
-	CGFloat height = kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0 ? isiPad() ? 546 : isPhone5() ? 374 : 299 : self.frame.size.height;
+	CGFloat height = kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0 ? isiPad() ? 546 : isPhone5() ? 357 : 299 : self.frame.size.height;
+	NSLog(@"ac3xx: height=%f", height);
 	idx = 0;
 	
 	UIView *wrapper = [[[UIView alloc] initWithFrame:CGRectMake(0, 0, width, height)] autorelease];
@@ -1302,13 +1304,14 @@ static MPMusicShuffleMode FAGetShuffleMode() {
 		
 		[imageView setImage:targetImage];
 		
+		objc_setAssociatedObject(self, &_iconImageViewKey, nil, OBJC_ASSOCIATION_ASSIGN);
 		objc_setAssociatedObject(self, &_iconImageViewKey, imageView, OBJC_ASSOCIATION_RETAIN);
-		[self addSubview:imageView];
+		[[[self subviews] objectAtIndex:0] addSubview:imageView];
 	}
 	
 	else {
 		UIImageView *imageView = objc_getAssociatedObject(self, &_iconImageViewKey);
-		if (imageView != nil && [[self subviews] containsObject:imageView]) {
+		if (imageView != nil && [[[[self subviews] objectAtIndex:0] subviews] containsObject:imageView]) {
 			[imageView removeFromSuperview];
 			objc_setAssociatedObject(self, &_iconImageViewKey, nil, OBJC_ASSOCIATION_ASSIGN);
 		}
