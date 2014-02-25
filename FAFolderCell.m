@@ -26,7 +26,7 @@
   matoe@matoe.co.cc
 **/
 
-// UI by Maximus. (@0_Maximus_0). He's also an awesome developer.
+// UI by Maximus. (@_mxms). He's also an awesome developer.
 
 #import "FAFolderCell.h"
 #import "FACalloutView.h"
@@ -62,10 +62,12 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
 
 @implementation FAFolderCell
 + (UIFont *)labelFont {
+	if (kCFCoreFoundationVersionNumber >= 800) return [UIFont fontWithName:@"HelveticaNeue-Light" size:18];
 	return [UIFont fontWithName:@"Helvetica" size:18];
 }
 
 + (UIFont *)smallLabelFont {
+	if (kCFCoreFoundationVersionNumber >= 800) return [UIFont fontWithName:@"HelveticaNeue-Light" size:14];
 	return [UIFont fontWithName:@"Helvetica" size:14];
 }
 
@@ -96,6 +98,9 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
 
 - (id)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
 	if ((self = [super initWithStyle:style reuseIdentifier:reuseIdentifier])) {
+		if (kCFCoreFoundationVersionNumber >= 800)
+			[self setBackgroundColor:[UIColor clearColor]];
+
 		idx = 0;
 		_property = [MPMediaItemPropertyPlaybackDuration retain];
 		_placeholder = [UIImageResize([UIImage imageWithContentsOfFile:@"/System/Library/PrivateFrameworks/iPodUI.framework/CoverFlowPlaceHolder44.png"], CGSizeMake(32, 32)) retain];
@@ -112,17 +117,18 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
 		[[self contentView] addSubview:_infoLabel];
 		
 		__imageView = [[[UIImageView alloc] initWithFrame:CGRectMake(10, 2.5, 32, 32)] autorelease];
-    	[[__imageView layer] setBorderWidth:.5f];
-    	[[__imageView layer] setBorderColor:[[UIColor whiteColor] CGColor]];
-    	[[self contentView] addSubview:__imageView];
+		[[__imageView layer] setBorderWidth:.5f];
+		[[__imageView layer] setBorderColor:[[UIColor whiteColor] CGColor]];
+		[[self contentView] addSubview:__imageView];
 		
 		/*UIImage *ind_ = [UIImage imageWithContentsOfFile:@"/System/Library/PrivateFrameworks/iPodUI.framework/NowPlayingListItemIcon.png"];
-    	_speaker = [[[UIImageView alloc] initWithFrame:CGRectMake((_label.frame.size.width-50)+1, _label.frame.origin.y, 28, 24)] autorelease];
-    	[_speaker setImage:ind_];
-    	[_speaker setHidden:YES];
-    	[self addSubview:_speaker];*/
+		_speaker = [[[UIImageView alloc] initWithFrame:CGRectMake((_label.frame.size.width-50)+1, _label.frame.origin.y, 28, 24)] autorelease];
+		[_speaker setImage:ind_];
+		[_speaker setHidden:YES];
+		[self addSubview:_speaker];*/
 		
-		CGFloat wid = (isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd;
+		//CGFloat wid = (isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd;
+		CGFloat wid = [self bounds].size.width - wd;
 		CGMutablePathRef path = CGPathCreateMutable();
 		CGPathMoveToPoint(path, NULL, wid, [self bounds].origin.y);
 		CGPathAddLineToPoint(path, NULL, wid, [self bounds].origin.y+38.f);
@@ -155,39 +161,45 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
 	UIImage *artwork = [self placeholderImage];
 	[__imageView setImage:artwork];
     
-    [_label setText:[_item valueForProperty:MPMediaItemPropertyTitle]];
-    [_infoLabel setText:[self valueForProperty]];
+	[_label setText:[_item valueForProperty:MPMediaItemPropertyTitle]];
+	[_infoLabel setText:[self valueForProperty]];
     
-    CGFloat wd = [FAFolderCell _widthForProperty:_property];
+	CGFloat wd = [FAFolderCell _widthForProperty:_property];
 	CGMutablePathRef path = CGPathCreateMutable();
-	CGPathMoveToPoint(path, NULL, (isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd, [self bounds].origin.y);
-	CGPathAddLineToPoint(path, NULL, (isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd, [self bounds].origin.y+38.f);
-    
-    [_shape setPath:path];
-    
-    [_label setFrame:(CGRect){_label.frame.origin, {(isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-(wd+50), _label.frame.size.height}}];
-    [_label setFont:(wd==65.f||isiPad() ? [FAFolderCell labelFont] : [FAFolderCell smallLabelFont])];
-    [_infoLabel setFrame:CGRectMake((isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd+10, 8, wd-15, 20)];
+	/*CGPathMoveToPoint(path, NULL, (isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd, [self bounds].origin.y);
+	CGPathAddLineToPoint(path, NULL, (isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd, [self bounds].origin.y+38.f);*/
+	CGPathMoveToPoint(path, NULL, [self bounds].size.width-wd, [self bounds].origin.y);
+	CGPathAddLineToPoint(path, NULL, [self bounds].size.width-wd, [self bounds].origin.y+38.f);
+	[_shape setPath:path];
+
+	[_label setFont:(wd==65.f||isiPad() ? [FAFolderCell labelFont] : [FAFolderCell smallLabelFont])];
+	/*[_label setFrame:(CGRect){_label.frame.origin, {(isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-(wd+50), _label.frame.size.height}}];
+	[_infoLabel setFrame:CGRectMake((isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd+10, 8, wd-15, 20)];*/
+	[_label setFrame:(CGRect){_label.frame.origin, {[self bounds].size.width-(wd+50), _label.frame.size.height}}];
+	[_infoLabel setFrame:CGRectMake([self bounds].size.width-wd+10, 8, wd-15, 20)];
 }
 
 - (void)_changeDetailAnimated {
 	CGFloat wd = [FAFolderCell _widthForProperty:_property];
 			
 	CGMutablePathRef path = CGPathCreateMutable();
-	CGPathMoveToPoint(path, NULL, (isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd, [self bounds].origin.y);
-	CGPathAddLineToPoint(path, NULL, (isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd, [self bounds].origin.y+38.f);
-	
+	/*CGPathMoveToPoint(path, NULL, (isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd, [self bounds].origin.y);
+	CGPathAddLineToPoint(path, NULL, (isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd, [self bounds].origin.y+38.f);*/
+	CGPathMoveToPoint(path, NULL, [self bounds].size.width-wd, [self bounds].origin.y);
+	CGPathAddLineToPoint(path, NULL, [self bounds].size.width-wd, [self bounds].origin.y+38.f);
 	[_shape setPath:path];
 	
 	_path = CGPathCreateCopy(path);
 	CGPathRelease(path);
 	
 	[UIView animateWithDuration:.1f animations:^{
-		[_label setFrame:(CGRect){_label.frame.origin, {(isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-(wd+50), _label.frame.size.height}}];
 		[_label setFont:(wd==65.f||isiPad() ? [FAFolderCell labelFont] : [FAFolderCell smallLabelFont])];
+		//[_label setFrame:(CGRect){_label.frame.origin, {(isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-(wd+50), _label.frame.size.height}}];
+		[_label setFrame:(CGRect){_label.frame.origin, {[self bounds].size.width-(wd+50), _label.frame.size.height}}];
 		
 		[_infoLabel setAlpha:0.f];
-		[_infoLabel setFrame:CGRectMake((isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd+10, 8, wd-15, 20)];
+		//[_infoLabel setFrame:CGRectMake((isiPad() ? (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 768 : 1024) : 320)-wd+10, 8, wd-15, 20)];
+		[_infoLabel setFrame:CGRectMake([self bounds].size.width-wd+10, 8, wd-15, 20)];
 		[_infoLabel setText:[self valueForProperty]];
 		[_infoLabel setAlpha:1.f];
 	}];
@@ -217,6 +229,7 @@ void FADrawLineAtPath(UIView *view, CGPathRef path) {
 }
 
 - (void)setDetailProperty:(NSString *)property change:(BOOL)change {
+	[_property release];
 	_property = [property retain];
 	
 	if (change) [self _changeDetailAnimated];

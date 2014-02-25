@@ -48,3 +48,6 @@ internal-stage::
 	
 	$(ECHO_NOTHING)mkdir -p $(THEOS_STAGING_DIR)/Library/Application\ Support/$(ECHO_END)
 	$(ECHO_NOTHING)cp -r Resources/ $(THEOS_STAGING_DIR)/Library/Application\ Support/FoldAlbum$(ECHO_END)
+
+after-install::
+	install.exec "killall -9 backboardd"

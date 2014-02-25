@@ -122,7 +122,7 @@ static FAPreferencesHandler *sharedInstance_ = nil;
 }
 
 - (void)deleteKey:(NSString *)key {
-	NSDictionary *obj;
+	__block NSDictionary *obj = nil;
 	NSUInteger count = [_cache count];
 	for (NSUInteger i=0; i<count; i++) {
 		if ([[[_cache objectAtIndex:i] objectForKey:@"keyTitle"] isEqualToString:key]) {

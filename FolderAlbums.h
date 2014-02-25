@@ -43,6 +43,11 @@ typedef struct {
     UIImage *image;
 } MPMediaItemArtworkInternal;
 
+@interface AVAudioSession : NSObject
++ (id)sharedInstance;
+- (BOOL)isOtherAudioPlaying;
+@end
+
 @interface SBApplication : NSObject
 @end
 
@@ -76,14 +81,31 @@ typedef struct {
 - (void)setKeyName:(NSString *)key;
 @end
 
-@interface SBFolderView : UIView
+@interface SBFolderBackgroundView : UIView
++ (CGFloat)cornerRadiusToInsetContent;
 @end
 
-@interface FAFolderView : SBFolderView <UITableViewDelegate, UITableViewDataSource, FACalloutViewDelegate>
-- (FAFolder *)folder;
-- (UILabel *)groupLabel;
+@interface SBFolderView : UIView
+- (NSArray *)iconListViews;
+@end
+
+@interface FACommonFolderView : SBFolderView <UITableViewDelegate, UITableViewDataSource>
 - (NSArray *)itemKeys;
 - (void)rotateToOrientation:(int)orientation;
+- (FAFolder *)folder;
+- (void)initializeProgTimer;
+- (void)initializeControlViewWithSuperview:(UIView *)superview haveExtraView:(BOOL)extra;
+- (Class)detailSliderClass;
+@end
+
+@interface FAFolderView : FACommonFolderView <FACalloutViewDelegate>
+- (UILabel *)groupLabel;
+@end
+
+@interface FAFloatyFolderView : FACommonFolderView <UITableViewDelegate, UITableViewDataSource>
+- (void)setupArtistLabel;
+- (void)setupFolderAlbumsInView:(UIView *)view;
+- (void)createFolderAlbumsInView:(UIView *)view;
 @end
 
 @interface SBIcon : NSObject
@@ -129,6 +151,10 @@ typedef struct {
 - (void)insertIcon:(SBIcon *)icon atIndex:(NSUInteger)index moveNow:(BOOL)moveNow;
 @end
 
+@interface SBRootFolderController : NSObject
+- (SBFolderView *)contentView;
+@end
+
 @interface SBIconController : NSObject
 + (SBIconController *)sharedInstance;
 - (void)addNewAlbumIconWithUnusedMessageName:(NSString *)messageName userInfo:(NSDictionary *)userInfo;
@@ -140,6 +166,7 @@ typedef struct {
 - (void)updateCurrentIconListIndexAndVisibility;
 - (void)scrollToIconListAtIndex:(int)index animate:(BOOL)animate;
 - (id)addEmptyListViewForFolder:(id)folder;
+- (SBRootFolderController *)_rootFolderController;
 @end
 
 @interface SBIconModel : NSObject
@@ -154,6 +181,7 @@ typedef struct {
 
 @interface MPDetailSlider : UISlider
 + (CGFloat)defaultHeight;
+- (id)initWithFrame:(CGRect)frame style:(int)style;
 - (void)setAllowsDetailScrubbing:(BOOL)allows;
 - (void)setDuration:(NSTimeInterval)duration;
 - (void)setDelegate:(id)delegate;
@@ -171,4 +199,8 @@ typedef struct {
 @end
 
 @interface FAFolderIcon : SBFolderIcon
+@end
+
+@interface SBFolderIconImageView : UIImageView
+- (SBFolderIcon *)_folderIcon;
 @end
