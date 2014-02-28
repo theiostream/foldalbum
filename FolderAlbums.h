@@ -58,6 +58,7 @@ typedef struct {
 
 @interface SBMediaController : NSObject
 + (BOOL)applicationCanBeConsideredNowPlaying:(SBApplication *)playing;
+- (BOOL)isPlaying;
 @end
 
 @interface SBFolderTitleLabel : UILabel

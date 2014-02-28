@@ -181,7 +181,13 @@ static inline UIImage *PlayOrPauseImage(BOOL play) {
 }
 
 static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
-	if (kCFCoreFoundationVersionNumber >= 800) return [[%c(AVAudioSession) sharedInstance] isOtherAudioPlaying]; // -playbackState is broken on iOS 7.
+	/*//if (kCFCoreFoundationVersionNumber >= 800) return [[%c(AVAudioSession) sharedInstance] isOtherAudioPlaying]; // -playbackState is broken on iOS 7.
+	BOOL ret = state != MPMusicPlaybackStateStopped && state != MPMusicPlaybackStatePaused && state != MPMusicPlaybackStateInterrupted;
+	if (kCFCoreFoundationVersionNumber < 800) return ret;
+
+	return ret ?: [[%c(SBMediaController) sharedInstance] isPlaying];*/
+
+	if (kCFCoreFoundationVersionNumber >= 800) return [[%c(SBMediaController) sharedInstance] isPlaying];
 	return state != MPMusicPlaybackStateStopped && state != MPMusicPlaybackStatePaused && state != MPMusicPlaybackStateInterrupted;
 }
 
@@ -621,6 +627,7 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 %new(v@:)
 - (void)receivedTrackChanged {
 	%log;
+	NSLog(@"[TRACK] IS PLAYING: %d", FAIsPlaying(0));
 	
 	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
 	MPMediaItem *item = [music nowPlayingItem];
@@ -683,14 +690,21 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	MPDetailSlider *slider = objc_getAssociatedObject(self, &_sliderKey);
 	[slider setDuration:dur];
 	[slider setValue:pla animated:NO];
+
+	//[self receivedStateChanged];
 }
 
 %new(v@:)
 - (void)receivedStateChanged {
+	%log;
+	NSLog(@"[STATE] IS PLAYING: %d", FAIsPlaying(0));
+
 	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
 	MPMusicPlaybackState state = [music playbackState];
-	
+	NSLog(@"[STATE] STATE IS %d", state);
+
 	BOOL isPlaying = FAIsPlaying(state);
+	NSLog(@"STATE: SETTING %@ IMAGE", !isPlaying ? @"Play" : @"Pause");
 	[objc_getAssociatedObject(self, &_playButtonKey) setImage:PlayOrPauseImage(!isPlaying) forState:UIControlStateNormal];
 	
 	//if (!progTimer || ![progTimer isValid]) progTimer = [NSTimer scheduledTimerWithTimeInterval:1.f target:self selector:@selector(updateSlider) userInfo:nil repeats:YES];
@@ -698,8 +712,8 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	//	draggingSlider = YES;
 	//}
 	
-	if (!FAIsPlaying(state)) {
-		NSLog(@"State %i", state);
+	if (FAIsPlaying(state)) {
+		NSLog(@"STATE: INITIALIZE TIMER.");
 		if (progTimer == nil)
 			progTimer = [NSTimer scheduledTimerWithTimeInterval:1.f target:self selector:@selector(updateSlider) userInfo:nil repeats:YES];
 		else if (![progTimer isValid])
@@ -766,6 +780,9 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 
 %new(v@:@)
 - (void)clickedPlayButton:(UIButton *)button {
+	%log;
+	NSLog(@"[CLICKED] IS PLAYING: %d", FAIsPlaying(0));
+
 	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
 	MPMediaItem *item = [music nowPlayingItem];
 	MPMusicPlaybackState state = [music playbackState];
@@ -777,13 +794,15 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	
 	UIButton *controlsButton = objc_getAssociatedObject(self, &_playButtonKey);
 	if (FAIsPlaying(state)) {
-		if (![button isEqual:controlsButton]) [button setImage:PlayOrPauseImage(YES) forState:UIControlStateNormal];
-		[music pause];
+		//if (![button isEqual:controlsButton]) [button setImage:PlayOrPauseImage(NO) forState:UIControlStateNormal];
+		//[music pause];
+		[[%c(SBMediaController) sharedInstance] pause];
 	}
 	
 	else {
-		if (![button isEqual:controlsButton]) [button setImage:PlayOrPauseImage(NO) forState:UIControlStateNormal];
-		[music play];
+		//if (![button isEqual:controlsButton]) [button setImage:PlayOrPauseImage(YES) forState:UIControlStateNormal];
+		//[music play];
+		[[%c(SBMediaController) sharedInstance] play];
 	}
 	
 	//[self receivedTrackChanged];
@@ -954,7 +973,7 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 		
 		[[UIApplication sharedApplication] launchMusicPlayerSuspended];
 		[[MPMusicPlayerController iPodMusicPlayer] beginGeneratingPlaybackNotifications];
-		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(receivedStateChanged) name:MPMusicPlayerControllerPlaybackStateDidChangeNotification object:nil];
+		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(receivedStateChanged) name:@"SBMediaNowPlayingChangedNotification" object:nil];
 		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(receivedTrackChanged) name:MPMusicPlayerControllerNowPlayingItemDidChangeNotification object:nil];
 		
 		UIView *scrollClipView = MSHookIvar<UIView *>(self, "_scrollClipView");
