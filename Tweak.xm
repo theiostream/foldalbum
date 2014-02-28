@@ -795,14 +795,14 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	UIButton *controlsButton = objc_getAssociatedObject(self, &_playButtonKey);
 	if (FAIsPlaying(state)) {
 		//if (![button isEqual:controlsButton]) [button setImage:PlayOrPauseImage(NO) forState:UIControlStateNormal];
-		//[music pause];
-		[[%c(SBMediaController) sharedInstance] pause];
+		[music pause];
+		//[[%c(SBMediaController) sharedInstance] pause];
 	}
 	
 	else {
 		//if (![button isEqual:controlsButton]) [button setImage:PlayOrPauseImage(YES) forState:UIControlStateNormal];
-		//[music play];
-		[[%c(SBMediaController) sharedInstance] play];
+		[music play];
+		//[[%c(SBMediaController) sharedInstance] play];
 	}
 	
 	//[self receivedTrackChanged];
