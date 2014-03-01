@@ -60,7 +60,7 @@
 + (UIImage *)imageNamed:(NSString *)name inBundle:(NSBundle *)bundle;
 @end
 
-#define isiPad() ([UIDevice instancesRespondToSelector:@selector(isWildcat)] && [[UIDevice currentDevice] isWildcat])
+#define isiPad() (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad)
 #define isPhone5() ( fabs( ( double )[ [ UIScreen mainScreen ] bounds ].size.height - ( double )568 ) < DBL_EPSILON )
 
 // From CyDelete: DHowett is awesome.
@@ -278,28 +278,6 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 
 /* }}} */
 
-%hook SBIconController
-- (void)willAnimateRotationToInterfaceOrientation:(int)orientation duration:(double)duration {
-	%log;
-	%orig;
-	
-	if (kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0) {
-		SBFolderView *folderView = MSHookIvar<SBFolderView *>(self, "_folderView");
-		if ([folderView isKindOfClass:%c(FAFolderView)]) {
-			[(FAFolderView *)folderView rotateToOrientation:orientation];
-		}
-	}
-}
-%end
-
-%group FMFloatyFolder7x
-%hook SBFolderController
-- (Class)_contentViewClass {
-	return [[self folder] isKindOfClass:%c(FAFolder)] ? %c(FAFloatyFolderView) : %orig;
-}
-%end
-%end
-
 /* Common Folder View {{{ */
 %subclass FACommonFolderView : SBFolderView
 %new(v@:)
@@ -363,7 +341,7 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	
 	UILabel *artistLabel = [[[UILabel alloc] initWithFrame:CGRectZero] autorelease];
 	[artistLabel setText:artist];
-	[artistLabel setFont:[UIFont fontWithName:kCFCoreFoundationVersionNumber>=800 ? @"HelveticaNeue-Light" : @".HelveticaNeueUI-Bold" size:12.f]];
+	[artistLabel setFont:[UIFont fontWithName:kCFCoreFoundationVersionNumber>=800 ? @"HelveticaNeue-Light" : @".HelveticaNeueUI-Bold" size:kCFCoreFoundationVersionNumber>=800 ? 14.f : 12.f]];
 	[artistLabel setTextAlignment:UITextAlignmentCenter];
 	[artistLabel setTextColor:[UIColor whiteColor]];
 	[artistLabel setBackgroundColor:[UIColor clearColor]];
@@ -378,7 +356,7 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	
 	UILabel *songLabel = [[[UILabel alloc] initWithFrame:CGRectZero] autorelease];
 	[songLabel setText:song];
-	[songLabel setFont:[UIFont fontWithName:kCFCoreFoundationVersionNumber>=800 ? @"HelveticaNeue-Light" : @".HelveticaNeueUI-Bold" size:12.f]];
+	[songLabel setFont:[UIFont fontWithName:kCFCoreFoundationVersionNumber>=800 ? @"HelveticaNeue-Light" : @".HelveticaNeueUI-Bold" size:kCFCoreFoundationVersionNumber>=800 ? 14.f : 12.f]];
 	[songLabel setTextAlignment:UITextAlignmentCenter];
 	[songLabel setTextColor:[UIColor whiteColor]];
 	[songLabel setBackgroundColor:[UIColor clearColor]];
@@ -392,7 +370,7 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 		
 	UILabel *albumLabel = [[[UILabel alloc] initWithFrame:CGRectZero] autorelease];
 	[albumLabel setText:album];
-	[albumLabel setFont:[UIFont fontWithName:kCFCoreFoundationVersionNumber>=800 ? @"HelveticaNeue-Light" : @".HelveticaNeueUI-Bold" size:12.f]];
+	[albumLabel setFont:[UIFont fontWithName:kCFCoreFoundationVersionNumber>=800 ? @"HelveticaNeue-Light" : @".HelveticaNeueUI-Bold" size:kCFCoreFoundationVersionNumber>=800 ? 14.f : 12.f]];
 	[albumLabel setTextAlignment:UITextAlignmentCenter];
 	[albumLabel setTextColor:[UIColor whiteColor]];
 	[albumLabel setBackgroundColor:[UIColor clearColor]];
@@ -443,12 +421,14 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	
 	UILabel *trackLabel = [[[UILabel alloc] initWithFrame:CGRectZero] autorelease];
 	[trackLabel setText:trackText];
-	[trackLabel setFont:[UIFont fontWithName:@".HelveticaNeueUI-Bold" size:12.f]];
+	[trackLabel setFont:[UIFont fontWithName:kCFCoreFoundationVersionNumber>=800 ? @"HelveticaNeue-Light" : @".HelveticaNeueUI-Bold" size:12.f]];
 	[trackLabel setTextAlignment:UITextAlignmentCenter];
 	[trackLabel setTextColor:[UIColor whiteColor]];
 	[trackLabel setBackgroundColor:[UIColor clearColor]];
-	[trackLabel setShadowColor:[UIColor blackColor]];
-	[trackLabel setShadowOffset:CGSizeMake(0, 1)];
+	if (kCFCoreFoundationVersionNumber < 800) {	
+		[trackLabel setShadowColor:[UIColor blackColor]];
+		[trackLabel setShadowOffset:CGSizeMake(0, 1)];
+	}
 	
 	objc_setAssociatedObject(self, &_trackLabelKey, trackLabel, OBJC_ASSOCIATION_RETAIN);
 	[extraView addSubview:trackLabel];
@@ -792,7 +772,7 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 		[music setQueueWithItemCollection:collection];
 	}
 	
-	UIButton *controlsButton = objc_getAssociatedObject(self, &_playButtonKey);
+	//UIButton *controlsButton = objc_getAssociatedObject(self, &_playButtonKey);
 	if (FAIsPlaying(state)) {
 		//if (![button isEqual:controlsButton]) [button setImage:PlayOrPauseImage(NO) forState:UIControlStateNormal];
 		[music pause];
@@ -902,12 +882,12 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 		MPMusicRepeatModeNone);
 	[music setRepeatMode:newMode];
 	
-	const char *imageTitle = (
-		newMode == MPMusicRepeatModeAll ? "repeat_on.png" :
-		newMode == MPMusicRepeatModeOne ? "repeat_on_1.png" :
-		"repeat_off.png");
+	NSString *imageTitle = (
+		newMode == MPMusicRepeatModeAll ? @"repeat_on.png" :
+		newMode == MPMusicRepeatModeOne ? @"repeat_on_1.png" :
+		@"repeat_off.png");
 	
-	UIImage *repeatImage = [UIImage imageWithContentsOfFile:[NSString stringWithFormat:@"/System/Library/Frameworks/MediaPlayer.framework/%s", imageTitle]];
+	UIImage *repeatImage = MediaPlayerImage(imageTitle);
 	[objc_getAssociatedObject(self, &_repeatButton) setImage:repeatImage forState:UIControlStateNormal];
 }
 
@@ -923,11 +903,11 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 		MPMusicShuffleModeOff);
 	[music setShuffleMode:newMode];
 	
-	const char *imageTitle = (
-		newMode == MPMusicShuffleModeSongs ? "shuffle_on.png" :
-		"shuffle_off.png");
+	NSString *imageTitle = (
+		newMode == MPMusicShuffleModeSongs ? @"shuffle_on.png" :
+		@"shuffle_off.png");
 	
-	UIImage *shuffleImage = [UIImage imageWithContentsOfFile:[NSString stringWithFormat:@"/System/Library/Frameworks/MediaPlayer.framework/%s", imageTitle]];
+	UIImage *shuffleImage = MediaPlayerImage(imageTitle);
 	[objc_getAssociatedObject(self, &_shuffleButton) setImage:shuffleImage forState:UIControlStateNormal];
 	
 	NSInteger cur, tot;
@@ -954,6 +934,12 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 /* FAFloatyFolderView {{{ */ 
 
 %group FAFolderView7x
+%hook SBFolderController
+- (Class)_contentViewClass {
+	return [[self folder] isKindOfClass:%c(FAFolder)] ? %c(FAFloatyFolderView) : %orig;
+}
+%end
+
 %subclass FAFloatyFolderView : FACommonFolderView 
 %new
 - (Class)detailSliderClass {
@@ -1000,6 +986,17 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	[objc_getAssociatedObject(self, &_floatyArtistLabel) setAlpha:1 - arg1];
 }
 
+- (void)textFieldDidEndEditing:(UITextField *)textField {
+	NSString *key = [(FAFolder *)[self folder] keyName];
+	NSString *res = [[textField text] isEqualToString:@""] ? key : [textField text];
+	
+	NSDictionary *update = [NSDictionary dictionaryWithObject:res forKey:@"fakeTitle"];
+	[[FAPreferencesHandler sharedInstance] optimizedUpdateKey:key withDictionary:update];
+	
+	[[self folder] setDisplayName:res];
+	%orig;
+}
+
 %new(v@:@)
 - (void)createFolderAlbumsInView:(UIView *)view {
 	%log;
@@ -1026,7 +1023,7 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	[[dataTable layer] setBorderWidth:.8f];
 	[[dataTable layer] setBorderColor:[[UIColor whiteColor] CGColor]];
 	[[dataTable layer] setMasksToBounds:YES];
-	[[dataTable layer] setCornerRadius:8.f];
+	[[dataTable layer] setCornerRadius:isiPad() ? 38.f : 28.f];
 	
 	UISwipeGestureRecognizer *rig = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(nextItem:)];
 	[rig setDirection:UISwipeGestureRecognizerDirectionRight];
@@ -1045,7 +1042,7 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	[[controlsView layer] setBorderWidth:.8f];
 	[[controlsView layer] setBorderColor:[[UIColor whiteColor] CGColor]];
 	[[controlsView layer] setMasksToBounds:YES];
-	[[controlsView layer] setCornerRadius:8.f];
+	[[controlsView layer] setCornerRadius:isiPad() ? 38.f : 28.f];
 	[controlsView setPagingEnabled:YES];
 	
 	[self initializeControlViewWithSuperview:controlsView haveExtraView:NO];
@@ -1081,17 +1078,17 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	
 	[objc_getAssociatedObject(self, &_mainViewKey) setFrame:[view bounds]];
 	
-	CGRect tableFrame = CGRectMake(8.f, 12.f, [view bounds].size.width-16.f, [view bounds].size.height/4*3-24.f);
+	CGRect tableFrame = CGRectMake(8.f, isiPad() ? 12.f : 8.f, [view bounds].size.width-16.f, [view bounds].size.height/4*3-24.f);
 	[objc_getAssociatedObject(self, &_floatyDataTableKey) setFrame:tableFrame];
 	
 	UIScrollView *controlsView = ASS(&_floatyControlsViewKey);
-	[controlsView setFrame:CGRectMake(tableFrame.origin.x, tableFrame.origin.y+tableFrame.size.height+12.f, tableFrame.size.width, [view bounds].size.height/4-20.f)];
+	[controlsView setFrame:CGRectMake(tableFrame.origin.x, tableFrame.origin.y+tableFrame.size.height+8.f, tableFrame.size.width, [view bounds].size.height/4 - (isiPad() ? 4.f : 0.f))];
 	[controlsView setContentSize:CGSizeMake(tableFrame.size.width*2, [controlsView frame].size.height)];
 	
-	CGRect artworkFrame = CGRectMake(5.f, 5.f, [controlsView frame].size.height-10.f, [controlsView frame].size.height-10.f);
+	CGRect artworkFrame = CGRectMake(15.f, 5.f, [controlsView frame].size.height-10.f, [controlsView frame].size.height-10.f);
 	[ASS(&_nowPlayingImageKey) setFrame:artworkFrame];
 	
-	CGRect firstFrame = CGRectMake(artworkFrame.origin.x + artworkFrame.size.width + 5.f, artworkFrame.origin.y, [controlsView frame].size.width-(artworkFrame.origin.x + artworkFrame.size.width + 5.f), pttopx(12.f));
+	CGRect firstFrame = CGRectMake(artworkFrame.origin.x + artworkFrame.size.width + 5.f, artworkFrame.origin.y + (isiPad() ? 24.f : 3.f), [controlsView frame].size.width-(artworkFrame.origin.x + artworkFrame.size.width + 5.f), pttopx(14.f));
 	[ASS(&_artistLabel) setFrame:firstFrame];
 	firstFrame.origin.y += firstFrame.size.height;
 	[ASS(&_songLabel) setFrame:firstFrame];
@@ -1100,14 +1097,16 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 
 	CGFloat originX = [controlsView frame].size.width;
 	CGFloat halfWidth = [controlsView frame].size.width/2;
-	[ASS(&_backButtonKey) setFrame:CGRectMake(originX + halfWidth/3-15, 5.f, 30, 27)];
-	[ASS(&_playButtonKey) setFrame:CGRectMake(originX + halfWidth/3*2-11, 5.f, 23, 26)];
-	[ASS(&_forwardButtonKey) setFrame:CGRectMake(originX + halfWidth-15, 5.f, 30, 27)];
+	CGFloat baseY = isiPad() ? 28.f : 8.f;
+	[ASS(&_backButtonKey) setFrame:CGRectMake(originX + halfWidth/3-15, baseY, 30, 27)];
+	[ASS(&_playButtonKey) setFrame:CGRectMake(originX + halfWidth/3*2-11, baseY, 23, 26)];
+	[ASS(&_forwardButtonKey) setFrame:CGRectMake(originX + halfWidth-15, baseY, 30, 27)];
 	
-	[ASS(&_repeatButton) setFrame:CGRectMake(originX*2 - halfWidth/3, 7, 25, 21)];
-	[ASS(&_shuffleButton) setFrame:CGRectMake(originX*2 - halfWidth/3 - 25, 7, 25, 21)];
+	[ASS(&_repeatButton) setFrame:CGRectMake(originX*2 - halfWidth/3, baseY+3, 25, 21)];
+	[ASS(&_shuffleButton) setFrame:CGRectMake(originX*2 - halfWidth/3 - 25, baseY+3, 25, 21)];
 	
-	[ASS(&_sliderKey) setFrame:CGRectMake(originX, 32, [controlsView frame].size.width, kCFCoreFoundationVersionNumber >= 800 ? 34.f : [MPDetailSlider defaultHeight])];
+	[ASS(&_sliderKey) setFrame:CGRectMake(originX, baseY+27, [controlsView frame].size.width, 34.f)];
+	[ASS(&_trackLabelKey) setFrame:CGRectMake(originX, baseY+49, [controlsView frame].size.width, pttopx(12.f))];
 }
 %end
 %end
@@ -1118,6 +1117,20 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 // TODO: Check exactly how SBNewsstandFolderView handles all this shit! :P
 // Meanwhile we seem to be fine...
 %group FAFolderView5x6x
+%hook SBIconController
+- (void)willAnimateRotationToInterfaceOrientation:(int)orientation duration:(double)duration {
+	%log;
+	%orig;
+	
+	if (kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0) {
+		SBFolderView *folderView = MSHookIvar<SBFolderView *>(self, "_folderView");
+		if ([folderView isKindOfClass:%c(FAFolderView)]) {
+			[(FAFolderView *)folderView rotateToOrientation:orientation];
+		}
+	}
+}
+%end
+
 %subclass FAFolderView : FACommonFolderView
 %new
 - (Class)detailSliderClass {
@@ -1569,12 +1582,13 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	%orig;
 	
 	NSLog(@"ICON FOLDER IS %@", [icon folder]);
+
+	// If we find the imageview, should we return; or reset it?
+	// idk how caching works and this doesn't make scrolling slow, so let's keep it.
+	if ([self viewWithTag:88])
+		[[self viewWithTag:88] removeFromSuperview];
+
 	if ([[icon folder] isKindOfClass:%c(FAFolder)]) {
-		// If we find the imageview, should we return; or reset it?
-		// idk how caching works and this doesn't make scrolling slow, so let's keep it.
-		if ([self viewWithTag:88])
-			[[self viewWithTag:88] removeFromSuperview];
-		
 		UIView *background = MSHookIvar<UIView *>(self, "_backgroundView");
 		UIView *grid = MSHookIvar<UIView *>(self, "_pageGridContainer");
 		if ([grid superview]) [grid removeFromSuperview];
@@ -1805,12 +1819,7 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	dlopen("/Library/MobileSubstrate/DynamicLibraries/IconSupport.dylib", RTLD_NOW);
 	[[objc_getClass("ISIconSupport") sharedInstance] addExtension:@"am.theiostre.foldalbum"];
 
-	dlopen("/System/Library/PrivateFrameworks/MusicUI.framework/MusicUI", RTLD_LAZY);
-	
-	// Init iOS 7 SBFolderController hook for loading FAFloatyFolderView
-	if (kCFCoreFoundationVersionNumber >= 800) {
-		%init(FMFloatyFolder7x);
-	}
+	//dlopen("/System/Library/PrivateFrameworks/MusicUI.framework/MusicUI", RTLD_LAZY);
 	
 	// Init SBIconModel layouting hooks.
 	if (kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0) {
