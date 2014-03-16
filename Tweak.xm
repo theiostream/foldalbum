@@ -1108,6 +1108,19 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	[ASS(&_sliderKey) setFrame:CGRectMake(originX, baseY+27, [controlsView frame].size.width, 34.f)];
 	[ASS(&_trackLabelKey) setFrame:CGRectMake(originX, baseY+49, [controlsView frame].size.width, pttopx(12.f))];
 }
+
+- (void)dealloc {
+	NSLog(@"CALLED DEALLOC UPON FOLDER CLOSE IOS7");
+
+	[[NSNotificationCenter defaultCenter] removeObserver:self];
+	[[MPMusicPlayerController iPodMusicPlayer] endGeneratingPlaybackNotifications];
+	
+	draggingSlider = NO;
+	
+	objc_removeAssociatedObjects(self);
+	
+	%orig;
+}
 %end
 %end
 
@@ -1436,6 +1449,57 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	[alert setAnchorPoint:CGPointMake((isiPad() ? 695.5 : 267.5), 25) boundaryRect:[[UIScreen mainScreen] applicationFrame] animate:YES];
 	[self addSubview:alert];
 }
+
+%new(v@:@)
+- (void)gotoControls:(UIButton *)btn {
+	UITableView *table = objc_getAssociatedObject(self, &_dataTableKey);
+	CGRect tableFrame = [table frame];
+
+	UIView *controlsView = objc_getAssociatedObject(self, &_controlsViewKey);
+	CGRect controlFrame = [controlsView frame];
+
+	NSLog(@"%@ %@", table, controlsView);
+
+	__block BOOL hideTable;
+	[UIView animateWithDuration:.2f animations:^{
+		if (tableFrame.origin.x >= (isiPad() ? 20 : -1)) {
+			[table setFrame:(CGRect){{-table.frame.size.width, table.frame.origin.y}, table.frame.size}];
+			[controlsView setFrame:tableFrame];
+
+			if (kCFCoreFoundationVersionNumber < kCFCoreFoundationVersionNumber_iOS_6_0) {
+				[table setAutoresizingMask:UIViewAutoresizingFlexibleRightMargin];
+				[controlsView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
+			}
+
+			hideTable = YES;
+		}
+
+		else {
+			[controlsView setFrame:(CGRect){{isiPad() ? controlsView.frame.origin.x+controlsView.frame.size.width+20.f : controlsView.frame.origin.x+controlsView.frame.size.width, controlsView.frame.origin.y}, controlsView.frame.size}];
+			[table setFrame:controlFrame];
+
+			if (kCFCoreFoundationVersionNumber < kCFCoreFoundationVersionNumber_iOS_6_0) {
+				[table setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
+				[controlsView setAutoresizingMask:UIViewAutoresizingFlexibleLeftMargin];
+			}
+
+			hideTable = NO;
+		}
+	}];
+
+	[btn setTransform:CGAffineTransformMakeRotation(hideTable ? M_PI : 0.f)];
+}
+
+- (void)dealloc {
+	[[NSNotificationCenter defaultCenter] removeObserver:self];
+	[[MPMusicPlayerController iPodMusicPlayer] endGeneratingPlaybackNotifications];
+	
+	draggingSlider = NO;
+	
+	objc_removeAssociatedObjects(self);
+	
+	%orig;
+}
 %end
 %end
 /* }}} */
@@ -1724,17 +1788,6 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 		
 		[model addAlbumFolderForTitle:(fake&&![fake isEqualToString:@""] ? fake : title) plusKeyName:title andMediaCollection:collection atIndex:icon insert:insert];
 	}
-}
-
-- (void)dealloc {
-	[[NSNotificationCenter defaultCenter] removeObserver:self];
-	[[MPMusicPlayerController iPodMusicPlayer] endGeneratingPlaybackNotifications];
-	
-	draggingSlider = NO;
-	
-	objc_removeAssociatedObjects(self);
-	
-	%orig;
 }
 %end
 
