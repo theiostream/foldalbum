@@ -48,6 +48,21 @@
 #import "FAMediaPickerInternal.h"
 #import "MPMediaItemCollection+Playable.h"
 
+#include <dlfcn.h>
+@interface UIImage (FAImageNamedInBundle)
++ (UIImage *)imageNamed:(NSString *)name inBundle:(NSBundle *)bundle;
+@end
+
+static UIImage *MediaPlayerImage(NSString *name) {
+	return [UIImage imageNamed:name inBundle:[NSBundle bundleWithIdentifier:@"com.apple.MediaPlayer"]];
+}
+static UIImage *MusicUIImage(NSString *name) {
+	if (![NSBundle bundleWithIdentifier:@"com.apple.MusicUI"]) dlopen("/System/Library/PrivateFrameworks/MusicUI.framework/MusicUI", RTLD_LAZY);
+	
+	NSBundle *bundle = [NSBundle bundleWithIdentifier:@"com.apple.MusicUI"];
+	return [UIImage imageNamed:name inBundle:bundle];
+}
+
 static UIImage *UIImageResize(UIImage *image, CGSize newSize) {
     UIGraphicsBeginImageContextWithOptions(newSize, NO, 0.0);
     [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
@@ -61,7 +76,7 @@ static UIImage *UIImageResize(UIImage *image, CGSize newSize) {
 @implementation FAInternalMediaPickerController
 - (FAInternalMediaPickerController *)initWithType:(int)type controller:(FAMediaPickerController *)ctrl {
 	if ((self = [super initWithStyle:UITableViewStylePlain])) {
-		_placeholder = [UIImageResize([UIImage imageWithContentsOfFile:@"/System/Library/Frameworks/MediaPlayer.framework/noartplaceholder.png"], CGSizeMake(55, 55)) retain];
+		_placeholder = [UIImageResize(MediaPlayerImage(@"noartplaceholder.png"), CGSizeMake(55, 55)) retain];
 		
 		_type = type;
 		_controller = ctrl;
@@ -184,11 +199,23 @@ static UIImage *UIImageResize(UIImage *image, CGSize newSize) {
 - (void)viewDidLoad {
 	FAInternalMediaPickerController *albums_ = [[[FAInternalMediaPickerController alloc] initWithType:0 controller:self] autorelease];
 	UINavigationController *albums = [[[UINavigationController alloc] initWithRootViewController:albums_] autorelease];
-	[[albums tabBarItem] setImage:[UIImage imageWithContentsOfFile:@"/System/Library/PrivateFrameworks/iPodUI.framework/BarAlbums.png"]];
+	
+	UIImage *albumsImage;
+	if (kCFCoreFoundationVersionNumber >= 800)
+		albumsImage = MusicUIImage(@"TabBarImage-Albums.png");
+	else
+		albumsImage = [UIImage imageWithContentsOfFile:@"/System/Library/PrivateFrameworks/iPodUI.framework/BarAlbums.png"];
+	[[albums tabBarItem] setImage:albumsImage];
 	
 	FAInternalMediaPickerController *playlists_ = [[[FAInternalMediaPickerController alloc] initWithType:1 controller:self] autorelease];
 	UINavigationController *playlists = [[[UINavigationController alloc] initWithRootViewController:playlists_] autorelease];
-	[[playlists tabBarItem] setImage:[UIImage imageWithContentsOfFile:@"/System/Library/PrivateFrameworks/iPodUI.framework/BarPlaylists.png"]];
+	
+	UIImage *playlistsImage;
+	if (kCFCoreFoundationVersionNumber >= 800)
+		playlistsImage = MusicUIImage(@"TabBarImage-Playlists.png");
+	else
+		playlistsImage = [UIImage imageWithContentsOfFile:@"/System/Library/PrivateFrameworks/iPodUI.framework/BarPlaylists.png"];
+	[[playlists tabBarItem] setImage:playlistsImage];
 	
 	NSArray *controllers = [NSArray arrayWithObjects:albums, playlists, nil];
 	[self setViewControllers:controllers animated:YES];

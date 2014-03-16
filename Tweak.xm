@@ -177,7 +177,9 @@ static inline UIImage *PlayOrPauseImage(BOOL play) {
 	}
 	
 	const char *imagestr = play ? "play.png" : "pause.png";
-	return [UIImage imageWithContentsOfFile:[NSString stringWithFormat:@"/System/Library/Frameworks/MediaPlayer.framework/%s.png", imagestr]];
+	NSString *imagename = [NSString stringWithFormat:@"/System/Library/Frameworks/MediaPlayer.framework/%s", imagestr];
+	NSLog(@"PlayOrPauseImage() returning %@", imagename);
+	return [UIImage imageWithContentsOfFile:imagename];
 }
 
 static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
@@ -392,10 +394,10 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	SETASS(&_backButtonKey, backButton, OBJC_ASSOCIATION_RETAIN);
 	[controlsView addSubview:backButton];
 	
-	NSString *playImageName = kCFCoreFoundationVersionNumber >= 800 ? @"/System/Library/PrivateFrameworks/MediaPlayerUI.framework/SystemMediaControl-Play-StarkNowPlaying.png" : @"/System/Library/Frameworks/MediaPlayer.framework/play.png";
-	NSString *pauseImageName = kCFCoreFoundationVersionNumber >= 800 ? @"/System/Library/PrivateFrameworks/MediaPlayerUI.framework/SystemMediaControl-Pause-StarkNowPlaying.png" : @"/System/Library/Frameworks/MediaPlayer.framework/pause.png";
-	UIImage *play = [UIImage imageWithContentsOfFile:playImageName];
-	UIImage *pause = [UIImage imageWithContentsOfFile:pauseImageName];
+	//NSString *playImageName = kCFCoreFoundationVersionNumber >= 800 ? @"/System/Library/PrivateFrameworks/MediaPlayerUI.framework/SystemMediaControl-Play-StarkNowPlaying.png" : @"/System/Library/Frameworks/MediaPlayer.framework/play.png";
+	//NSString *pauseImageName = kCFCoreFoundationVersionNumber >= 800 ? @"/System/Library/PrivateFrameworks/MediaPlayerUI.framework/SystemMediaControl-Pause-StarkNowPlaying.png" : @"/System/Library/Frameworks/MediaPlayer.framework/pause.png";
+	UIImage *play = PlayOrPauseImage(YES);
+	UIImage *pause = PlayOrPauseImage(NO);
 	UIButton *playButton = [UIButton buttonWithType:UIButtonTypeCustom];
 	[playButton setImage:(FAIsPlaying(state) ? pause : play) forState:UIControlStateNormal];
 	[playButton addTarget:self action:@selector(clickedPlayButton:) forControlEvents:UIControlEventTouchUpInside];
@@ -415,7 +417,7 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	
 	NSString *trackText;
 	if (cur > -1 && tot > -1)
-		trackText = [NSString stringWithFormat:@"Track %i of %i", cur, tot];
+		trackText = [NSString stringWithFormat:@"Track %ld of %ld", (long)cur, (long)tot];
 	else
 		trackText = @"Track -- of --";
 	
@@ -585,7 +587,6 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	}
 	
 	if (FAIsPlaying(state)) {
-		NSLog(@"State %i", state);
 		if (progTimer == nil)
 			progTimer = [NSTimer scheduledTimerWithTimeInterval:1.f target:self selector:@selector(updateSlider) userInfo:nil repeats:YES];
 		else if (![progTimer isValid])
@@ -662,7 +663,7 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	NSString *trackText;
 	UILabel *trackLabel = objc_getAssociatedObject(self, &_trackLabelKey);
 	if (cur > -1 && tot > -1)
-		trackText = [NSString stringWithFormat:@"Track %i of %i", cur, tot];
+		trackText = [NSString stringWithFormat:@"Track %ld of %ld", (long)cur, (long)tot];
 	else
 		trackText = @"Track -- of --";
 	[trackLabel setText:trackText];
@@ -681,7 +682,6 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 
 	MPMusicPlayerController *music = [MPMusicPlayerController iPodMusicPlayer];
 	MPMusicPlaybackState state = [music playbackState];
-	NSLog(@"[STATE] STATE IS %d", state);
 
 	BOOL isPlaying = FAIsPlaying(state);
 	NSLog(@"STATE: SETTING %@ IMAGE", !isPlaying ? @"Play" : @"Pause");
@@ -923,7 +923,7 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	NSString *trackText;
 	UILabel *trackLabel = objc_getAssociatedObject(self, &_trackLabelKey);
 	if (cur > -1 && tot > -1)
-		trackText = [NSString stringWithFormat:@"Track %i of %i", cur, tot];
+		trackText = [NSString stringWithFormat:@"Track %ld of %ld", (long)cur, (long)tot];
 	else
 		trackText = @"Track -- of --";
 	[trackLabel setText:trackText];
@@ -1151,8 +1151,7 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 }
 
 - (void)setRows:(NSUInteger)rows notchInfo:(SBNotchInfo)info orientation:(int)orientation {
-	NSLog(@"ac3xx: %d %d %d -- %i", kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0, isiPad(), isPhone5(), (kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0 ? (isiPad() ? 20 : (isPhone5() ? 20 : 16)) : rows));
-	%orig(kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0 ? (isiPad() ? 20 : (isPhone5() ? 24 : 16)) : rows, info, orientation);
+	%orig(kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_6_0 ? (isiPad() ? 20 : (isPhone5() ? 24 : 20)) : rows, info, orientation);
 }
 
 %new(@@:)
@@ -1329,7 +1328,7 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	[controllerContent addSubview:arrowButton];
 	[wrapper addSubview:controllerContent];
 	
-	CGRect tableFrame = CGRectMake((isiPad() ? 20 : -1), subtitleLabel.origin.y+25, (isiPad() ? UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 728 : 984 : 322), height-(subtitleLabel.origin.y+25));
+	CGRect tableFrame = CGRectMake((isiPad() ? 20 : -1), subtitleLabel.origin.y+25, (isiPad() ? UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]) ? 728 : 984 : 322), height-(subtitleLabel.origin.y+22));
 	NSLog(@"tableFrame: %@", NSStringFromCGRect(tableFrame));
 	UITableView *dataTable = [[[UITableView alloc] initWithFrame:tableFrame style:UITableViewStylePlain] autorelease];
 	NSLog(@"table frame: %@", NSStringFromCGRect([dataTable frame]));
@@ -1903,6 +1902,7 @@ static inline BOOL FAIsPlaying(MPMusicPlaybackState state) {
 	
 	CPDistributedMessagingCenter *messagingCenter = [CPDistributedMessagingCenter centerNamed:@"am.theiostre.foldalbum.server"];
 	[messagingCenter registerForMessageName:@"Relayout" target:handler selector:@selector(relayout)];
+	[messagingCenter registerForMessageName:@"UpdateTitles" target:handler selector:@selector(updateTitles)];
 	[messagingCenter registerForMessageName:@"UpdateKey" target:handler selector:@selector(updateKeyWithMessageName:userInfo:)];
 	[messagingCenter registerForMessageName:@"OptimizedUpdateKey" target:handler selector:@selector(optimizedUpdateKeyWithMessageName:userInfo:)];
 	[messagingCenter registerForMessageName:@"RemoveKey" target:handler selector:@selector(removeKeyWithMessageName:userInfo:)];

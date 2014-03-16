@@ -107,7 +107,8 @@
 		[messagingCenter sendMessageName:@"OptimizedUpdateKey" userInfo:[NSDictionary dictionaryWithObjectsAndKeys:_contentTitle,@"Key", dict,@"Dictionary", nil]];
 	}
 	
-	[messagingCenter sendMessageName:@"Relayout" userInfo:nil];
+	if (kCFCoreFoundationVersionNumber >= 800) [messagingCenter sendMessageName:@"UpdateTitles" userInfo:nil];
+	else [messagingCenter sendMessageName:@"Relayout" userInfo:nil];
 }
 	
 - (void)deleteFolder {

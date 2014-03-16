@@ -115,4 +115,34 @@ static FANotificationHandler *sharedInstance_ = nil;
 			[iconModel relayout];
 	}
 }
+
+- (void)updateTitles {
+	FAPreferencesHandler *handler = [FAPreferencesHandler sharedInstance];
+	
+	NSArray *rootIconLists = [[objc_getClass("SBIconController") sharedInstance] rootIconLists];
+	NSUInteger count = [rootIconLists count];
+	for (NSUInteger i=0; i<count; i++) {
+		SBIconListView *iconListView = [rootIconLists objectAtIndex:i];
+		SBIconListModel *model = [iconListView model];
+		
+		NSArray *icons = [model icons];
+		NSUInteger iconsCount = [icons count];
+		//NSLog(@"[!] Icons Count: %i", iconsCount);
+		for (NSUInteger j=0; j<iconsCount; j++) {
+			//NSLog(@"[!] Icon Index %i", j);
+			SBIcon *icon = [icons objectAtIndex:j];
+			if ([icon isKindOfClass:objc_getClass("FAFolderIcon")]) {
+				FAFolder *folder = (FAFolder *)[(FAFolderIcon *)icon folder];
+				
+				NSString *iconDisplayName = [folder keyName];
+				if (![handler keyExists:iconDisplayName])
+					continue;
+
+				NSDictionary *dict = [handler objectForKey:iconDisplayName];
+				[folder setDisplayName:[dict objectForKey:@"fakeTitle"]];
+				[(SBFolderIcon *)icon updateLabel];
+			}
+		}
+	}
+}
 @end

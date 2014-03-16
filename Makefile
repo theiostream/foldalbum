@@ -27,7 +27,8 @@
 ##  matoe@matoe.co.cc
 ##########
 
-TARGET = :clang
+TARGET = ::4.3
+ARCHS = armv7 arm64
 
 include theos/makefiles/common.mk
 

@@ -118,6 +118,7 @@ typedef struct {
 - (SBFolderIcon *)initWithFolder:(SBFolder *)folder;
 - (SBFolder *)folder;
 - (NSString *)displayName;
+- (void)updateLabel;
 @end
 
 @interface SBIconView : UIView
